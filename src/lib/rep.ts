@@ -13,6 +13,8 @@ export const REP = {
   referral: 25,
   vote: 1,
   replyReceived: 1,
+  // Question author marks your comment as the answer.
+  acceptedAnswer: 5,
   // Anti-farming: max referral payouts per referrer per 24h.
   referralDailyCap: 10,
   createBoard: 50,
@@ -22,6 +24,11 @@ export type VoteTarget = "wall" | "post" | "comment";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/**
+ * Writes one ledger row and moves users.rep by the same amount. Once-only
+ * reasons (reply, referral) are guarded by partial unique indexes: a duplicate
+ * insert is skipped and rep is left alone. Returns whether rep changed.
+ */
 async function addRep(
   tx: Tx | typeof db,
   userId: number,
@@ -30,24 +37,24 @@ async function addRep(
   sourceType: string,
   sourceId: number | null,
   actorUserId: number | null
-) {
-  if (!amount) return;
-  await tx.insert(repEvents).values({
-    userId,
-    amount,
-    reason,
-    sourceType,
-    sourceId,
-    actorUserId,
-  });
+): Promise<boolean> {
+  if (!amount) return false;
+  const inserted = await tx
+    .insert(repEvents)
+    .values({ userId, amount, reason, sourceType, sourceId, actorUserId })
+    .onConflictDoNothing()
+    .returning({ id: repEvents.id });
+  if (!inserted.length) return false;
   await tx
     .update(users)
     .set({ rep: sql`${users.rep} + ${amount}` })
     .where(eq(users.id, userId));
+  return true;
 }
 
-/** Referrer earns rep when someone joins through their link (daily-capped). */
+/** Referrer earns rep when someone joins through their link (daily-capped, once per new member). */
 export async function awardReferral(referrerId: number, newUserId: number) {
+  if (referrerId === newUserId) return 0;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -60,8 +67,68 @@ export async function awardReferral(referrerId: number, newUserId: number) {
       )
     );
   if (count >= REP.referralDailyCap) return 0;
-  await addRep(db, referrerId, REP.referral, "referral", "user", newUserId, newUserId);
-  return REP.referral;
+  const paid = await db.transaction((tx) =>
+    addRep(tx, referrerId, REP.referral, "referral", "user", newUserId, newUserId)
+  );
+  return paid ? REP.referral : 0;
+}
+
+/**
+ * Moves the "accepted answer" on a question post. The previous answer's author
+ * loses the bonus, the new one gains it; self-answers earn nothing.
+ * Pass commentId = null to un-mark. Returns false if the comment isn't on this post.
+ */
+export async function setAcceptedAnswer(
+  postId: number,
+  commentId: number | null,
+  actorUserId: number
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    // Row lock: concurrent mark/unmark clicks must apply one after another.
+    const [post] = await tx
+      .select()
+      .from(discussionPosts)
+      .where(eq(discussionPosts.id, postId))
+      .limit(1)
+      .for("update");
+    if (!post) return false;
+
+    let next: { id: number; authorUserId: number } | undefined;
+    if (commentId != null) {
+      [next] = await tx
+        .select({ id: discussionComments.id, authorUserId: discussionComments.authorUserId })
+        .from(discussionComments)
+        .where(
+          and(
+            eq(discussionComments.id, commentId),
+            eq(discussionComments.postId, postId),
+            eq(discussionComments.deleted, false)
+          )
+        )
+        .limit(1);
+      if (!next) return false;
+    }
+    if ((post.acceptedCommentId ?? null) === (next?.id ?? null)) return true;
+
+    if (post.acceptedCommentId != null) {
+      const [prev] = await tx
+        .select({ id: discussionComments.id, authorUserId: discussionComments.authorUserId })
+        .from(discussionComments)
+        .where(eq(discussionComments.id, post.acceptedCommentId))
+        .limit(1);
+      if (prev && prev.authorUserId !== post.authorUserId) {
+        await addRep(tx, prev.authorUserId, -REP.acceptedAnswer, "answer_unaccepted", "comment", prev.id, actorUserId);
+      }
+    }
+    if (next && next.authorUserId !== post.authorUserId) {
+      await addRep(tx, next.authorUserId, REP.acceptedAnswer, "accepted_answer", "comment", next.id, actorUserId);
+    }
+    await tx
+      .update(discussionPosts)
+      .set({ acceptedCommentId: next?.id ?? null })
+      .where(eq(discussionPosts.id, postId));
+    return true;
+  });
 }
 
 /** Author earns rep the first time a given person replies to their content. */
@@ -72,30 +139,21 @@ export async function awardReply(
   parentId: number
 ) {
   if (authorId === replierId) return;
-  const existing = await db
-    .select({ id: repEvents.id })
-    .from(repEvents)
-    .where(
-      and(
-        eq(repEvents.userId, authorId),
-        eq(repEvents.reason, "reply"),
-        eq(repEvents.sourceType, sourceType),
-        eq(repEvents.sourceId, parentId),
-        eq(repEvents.actorUserId, replierId)
-      )
-    )
-    .limit(1);
-  if (existing.length) return;
-  await addRep(db, authorId, REP.replyReceived, "reply", sourceType, parentId, replierId);
+  // The rep_events_reply_once unique index makes this safe under concurrency.
+  await db.transaction((tx) =>
+    addRep(tx, authorId, REP.replyReceived, "reply", sourceType, parentId, replierId)
+  );
 }
 
+/** Loads the vote target and locks its row so concurrent votes serialize. */
 async function loadTarget(tx: Tx, type: VoteTarget, id: number) {
   if (type === "wall") {
     const [row] = await tx
       .select({ authorId: wallPosts.authorUserId, profileId: wallPosts.profileUserId })
       .from(wallPosts)
       .where(eq(wallPosts.id, id))
-      .limit(1);
+      .limit(1)
+      .for("update");
     return row ? { authorId: row.authorId, profileId: row.profileId } : null;
   }
   if (type === "post") {
@@ -103,14 +161,16 @@ async function loadTarget(tx: Tx, type: VoteTarget, id: number) {
       .select({ authorId: discussionPosts.authorUserId, deleted: discussionPosts.deleted })
       .from(discussionPosts)
       .where(eq(discussionPosts.id, id))
-      .limit(1);
+      .limit(1)
+      .for("update");
     return row && !row.deleted ? { authorId: row.authorId, profileId: null } : null;
   }
   const [row] = await tx
     .select({ authorId: discussionComments.authorUserId, deleted: discussionComments.deleted })
     .from(discussionComments)
     .where(eq(discussionComments.id, id))
-    .limit(1);
+    .limit(1)
+    .for("update");
   return row && !row.deleted ? { authorId: row.authorId, profileId: null } : null;
 }
 

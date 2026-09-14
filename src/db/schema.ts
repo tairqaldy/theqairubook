@@ -9,14 +9,34 @@ import {
   index,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable(
   "users",
   {
     id: serial("id").primaryKey(),
     email: text("email").notNull().unique(),
+    // "" for pre-created (not yet activated) accounts: they cannot log in.
     passwordHash: text("password_hash").notNull(),
     name: text("name").notNull(),
+    // Name as written in the official student list (e.g. Cyrillic).
+    nativeName: text("native_name").notNull().default(""),
+    // null = pre-created from the student list, not activated yet.
+    claimedAt: timestamp("claimed_at"),
+    role: text("role").notNull().default("member"),
+    // Bumped on password change / admin reset to invalidate old sessions.
+    sessionVersion: integer("session_version").notNull().default(0),
+    // Admin reset after an impersonation report: only an admin claim link can activate it.
+    claimLocked: boolean("claim_locked").notNull().default(false),
+    // Suspended accounts can't log in (moderation).
+    suspendedAt: timestamp("suspended_at"),
+    headline: text("headline").notNull().default(""),
+    lookingFor: text("looking_for").notNull().default(""),
+    clubs: text("clubs").notNull().default(""),
+    telegram: text("telegram").notNull().default(""),
+    github: text("github").notNull().default(""),
+    instagram: text("instagram").notNull().default(""),
+    linkedin: text("linkedin").notNull().default(""),
     sex: text("sex").notNull().default(""),
     status: text("status").notNull().default("Student"),
     school: text("school").notNull().default("QAIRU"),
@@ -171,7 +191,13 @@ export const repEvents = pgTable(
     actorUserId: integer("actor_user_id").references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [index("rep_events_user").on(t.userId, t.createdAt)]
+  (t) => [
+    index("rep_events_user").on(t.userId, t.createdAt),
+    uniqueIndex("rep_events_reply_once")
+      .on(t.userId, t.sourceType, t.sourceId, t.actorUserId)
+      .where(sql`reason = 'reply'`),
+    uniqueIndex("rep_events_referral_once").on(t.sourceId).where(sql`reason = 'referral'`),
+  ]
 );
 
 export const boards = pgTable("boards", {
@@ -198,11 +224,86 @@ export const discussionPosts = pgTable(
     url: text("url").notNull().default(""),
     score: integer("score").notNull().default(0),
     commentCount: integer("comment_count").notNull().default(0),
+    // "discussion" | "question" | "material" | "announcement" (admin only)
+    flair: text("flair").notNull().default("discussion"),
+    pinned: boolean("pinned").notNull().default(false),
+    // For questions: the comment the author marked as the answer.
+    acceptedCommentId: integer("accepted_comment_id"),
     deleted: boolean("deleted").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("discussion_posts_board").on(t.boardId, t.createdAt)]
 );
+
+export const savedPosts = pgTable(
+  "saved_posts",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    postId: integer("post_id")
+      .notNull()
+      .references(() => discussionPosts.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("saved_posts_unique").on(t.userId, t.postId)]
+);
+
+// Uploaded images and PDFs attached to discussion posts / comments.
+export const media = pgTable(
+  "media",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    postId: integer("post_id").references(() => discussionPosts.id),
+    commentId: integer("comment_id").references(
+      (): AnyPgColumn => discussionComments.id
+    ),
+    // "image" | "pdf"
+    kind: text("kind").notNull(),
+    mime: text("mime").notNull(),
+    originalName: text("original_name").notNull(),
+    storedName: text("stored_name").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    // Deleted uploads keep their row (file removed) so the daily upload count holds.
+    deletedAt: timestamp("deleted_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("media_user").on(t.userId, t.createdAt),
+    index("media_post").on(t.postId),
+    index("media_comment").on(t.commentId),
+  ]
+);
+
+// One-time codes emailed to prove mailbox ownership (activation, password reset).
+export const emailCodes = pgTable(
+  "email_codes",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    // "claim" | "reset"
+    purpose: text("purpose").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at").notNull(),
+    consumedAt: timestamp("consumed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("email_codes_user").on(t.userId, t.purpose)]
+);
+
+// Small key/value store for one-time jobs (e.g. the launch bootstrap).
+export const appMeta = pgTable("app_meta", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 export const discussionComments = pgTable(
   "discussion_comments",
@@ -231,3 +332,4 @@ export type WallPost = typeof wallPosts.$inferSelect;
 export type Board = typeof boards.$inferSelect;
 export type DiscussionPost = typeof discussionPosts.$inferSelect;
 export type DiscussionComment = typeof discussionComments.$inferSelect;
+export type Media = typeof media.$inferSelect;

@@ -1,0 +1,218 @@
+/* admin styles */
+
+.admin-tabs {
+  margin-bottom: 8px;
+}
+
+.admin-tabs .tab {
+  margin-bottom: 3px;
+}
+
+.admin-tabs .tab.current:hover {
+  text-decoration: none;
+}
+
+/* compact data tables */
+.admin-scroll {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.admin-table td,
+.admin-table th {
+  padding: 3px 4px;
+  vertical-align: top;
+}
+
+.admin-grid th {
+  background: #eceff5;
+  border-bottom: 1px solid #d8dfea;
+  color: #333;
+  text-align: left;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.admin-grid td {
+  border-bottom: 1px solid #eceff5;
+}
+
+.admin-grid tr:nth-child(odd) td {
+  background: #f7f7f7;
+}
+
+.admin-grid tr.me td {
+  background: #fff9d7;
+}
+
+.admin-grid tr.admin-deleted td {
+  background: #fdf0f0;
+  color: #777;
+}
+
+.admin-grid tr.admin-deleted td a {
+  color: #888;
+}
+
+.admin-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-nowrap {
+  white-space: nowrap;
+}
+
+.admin-email {
+  word-break: break-all;
+  color: #555;
+}
+
+.admin-role {
+  color: #3b5998;
+}
+
+.admin-flag {
+  color: #c00;
+}
+
+/* account state badges */
+.admin-badge {
+  display: inline-block;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 14px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.admin-badge.suspended {
+  color: #fff;
+  background: #c00;
+  border-color: #a00;
+}
+
+.admin-badge.locked {
+  color: #7a5b00;
+  background: #fff4c2;
+  border-color: #e2c96b;
+}
+
+a.admin-badge:hover {
+  text-decoration: none;
+}
+
+.stat-num .admin-badge {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.btn.admin-danger {
+  background: #c00;
+  border-color: #900;
+  color: #fff;
+}
+
+.btn.admin-danger:hover {
+  background: #a00;
+}
+
+/* configuration status */
+.admin-config td {
+  vertical-align: middle;
+}
+
+.admin-on {
+  color: #2a7a2a;
+}
+
+.admin-off {
+  color: #c00;
+}
+
+/* per-row actions: collapsed so the 700px table stays readable */
+.admin-actions-cell {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.admin-actions summary {
+  cursor: pointer;
+  color: #3b5998;
+}
+
+.admin-actions summary:hover {
+  text-decoration: underline;
+}
+
+.admin-actions[open] {
+  text-align: left;
+  background: #fff;
+  border: 1px solid #d8dfea;
+  padding: 4px;
+  margin-top: 2px;
+}
+
+.admin-actions form {
+  margin: 4px 0 0;
+}
+
+.admin-actions input[type="text"] {
+  width: 130px;
+}
+
+.admin-filter {
+  margin-bottom: 6px;
+}
+
+.admin-filter input[type="text"] {
+  width: 220px;
+}
+
+.admin-pager {
+  margin: 8px 0;
+  text-align: center;
+}
+
+/* storage / activation meters */
+.admin-meter-label {
+  margin: 6px 0 2px;
+}
+
+.admin-meter {
+  height: 8px;
+  border: 1px solid #d8dfea;
+  background: #f7f7f7;
+}
+
+.admin-meter-fill {
+  height: 100%;
+  background: #6d84b4;
+}
+
+.admin-meter-fill.warn {
+  background: #c00;
+}
+
+.admin-import {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+}
+
+.admin-code {
+  background: #f7f7f7;
+  border: 1px solid #d8dfea;
+  padding: 4px 6px;
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 2px 0 6px;
+}

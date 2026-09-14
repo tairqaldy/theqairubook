@@ -1,13 +1,14 @@
 import { Hono } from "hono";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { AppEnv } from "../middleware/auth.js";
 import { needLogin } from "../middleware/auth.js";
 import { Layout, LeftNav, Box, timeAgo } from "../views/layout.js";
 import { db } from "../db/index.js";
 import { repEvents, users, wallPosts, type User } from "../db/schema.js";
-import { canViewProfile } from "../lib/social.js";
+import { canViewProfile, ensureReferralCode, friendIds } from "../lib/social.js";
 import { REP, castVote, type VoteTarget } from "../lib/rep.js";
-import { backPath, publicOrigin } from "../lib/url.js";
+import { backPath } from "../lib/url.js";
+import { inviteLink } from "../lib/invite.js";
 
 export const repRoutes = new Hono<AppEnv>();
 
@@ -70,6 +71,18 @@ function describe(
   switch (e.reason) {
     case "referral":
       return <>{who} joined through your invite link</>;
+    case "accepted_answer":
+      return (
+        <>
+          {who} marked <a href={`/d/c/${e.sourceId}`}>your comment</a> as the answer
+        </>
+      );
+    case "answer_unaccepted":
+      return (
+        <>
+          {who} un-marked <a href={`/d/c/${e.sourceId}`}>your answer</a>
+        </>
+      );
     case "reply":
       return <>{who} replied to {link}</>;
     case "upvote":
@@ -86,16 +99,22 @@ repRoutes.get("/rep", async (c) => {
   if (gate.redirect) return gate.redirect;
   const user = gate.user;
 
+  // Only activated members are ranked; pre-created accounts sit at 0 anyway.
   const leaders = await db
     .select()
     .from(users)
+    .where(and(isNotNull(users.claimedAt), isNull(users.suspendedAt)))
     .orderBy(desc(users.rep), users.id)
     .limit(25);
+  // Status/class year only for people whose privacy lets this viewer see them.
+  const myFriends = new Set(await friendIds(user.id));
+  const showDetails = (u: User) =>
+    u.privacy === "network" || u.id === user.id || myFriends.has(u.id);
 
   const [{ rank }] = await db
     .select({ rank: sql<number>`count(*)::int + 1` })
     .from(users)
-    .where(sql`${users.rep} > ${user.rep}`);
+    .where(and(isNotNull(users.claimedAt), isNull(users.suspendedAt), sql`${users.rep} > ${user.rep}`));
 
   const history = await db
     .select()
@@ -118,8 +137,10 @@ repRoutes.get("/rep", async (c) => {
     .groupBy(repEvents.reason);
   const totals = new Map(breakdown.map((b) => [b.reason, Number(b.total)]));
   const fromVotes = (totals.get("upvote") ?? 0) + (totals.get("downvote") ?? 0);
+  const fromAnswers =
+    (totals.get("accepted_answer") ?? 0) + (totals.get("answer_unaccepted") ?? 0);
 
-  const link = `${publicOrigin(c)}/r/${user.referralCode ?? ""}`;
+  const link = inviteLink(c, await ensureReferralCode(user));
 
   return c.html(
     <Layout title="Rep" user={user} banner="Rep">
@@ -152,17 +173,27 @@ repRoutes.get("/rep", async (c) => {
                     <div class="stat-num">+{totals.get("reply") ?? 0}</div>
                     <div class="meta">from replies</div>
                   </td>
+                  <td>
+                    <div class="stat-num">
+                      {fromAnswers >= 0 ? `+${fromAnswers}` : fromAnswers}
+                    </div>
+                    <div class="meta">from answers</div>
+                  </td>
                 </tr>
               </table>
             </Box>
 
             <Box title="[ How to Earn Rep ]">
+              <p class="rep-why">
+                Rep is a quiet signal of who helps others — not a popularity contest.
+              </p>
               <table class="bordertable rules">
                 <tr>
                   <td class="rule-pts">+{REP.referral}</td>
                   <td>
-                    A classmate joins through your invite link (up to{" "}
-                    {REP.referralDailyCap}/day). <a href="/invite">Get your link</a>
+                    A classmate activates their account through your invite link (they
+                    still need their @qairu.edu.kz email; up to {REP.referralDailyCap}
+                    /day). <a href="/invite">Get your link</a>
                   </td>
                 </tr>
                 <tr>
@@ -179,6 +210,10 @@ repRoutes.get("/rep", async (c) => {
                 <tr>
                   <td class="rule-pts">+{REP.replyReceived}</td>
                   <td>Someone new replies to your post or comment (once per person)</td>
+                </tr>
+                <tr>
+                  <td class="rule-pts">+{REP.acceptedAnswer}</td>
+                  <td>Your comment is marked as the answer to a question</td>
                 </tr>
                 <tr>
                   <td class="rule-pts">{REP.createBoard}</td>
@@ -201,11 +236,15 @@ repRoutes.get("/rep", async (c) => {
                           <td class="lb-rank">{i + 1}</td>
                           <td>
                             <a href={`/profile/${u.id}`}>{u.name}</a>
-                            <br />
-                            <span class="meta">
-                              {u.status}
-                              {u.classYear ? ` · ${u.classYear}` : ""}
-                            </span>
+                            {showDetails(u) ? (
+                              <>
+                                <br />
+                                <span class="meta">
+                                  {u.status}
+                                  {u.classYear ? ` · ${u.classYear}` : ""}
+                                </span>
+                              </>
+                            ) : null}
                           </td>
                           <td class="lb-rep">{u.rep}</td>
                         </tr>

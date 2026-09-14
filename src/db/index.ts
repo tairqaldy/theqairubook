@@ -11,6 +11,11 @@ const url =
   "postgres://qairu:qairu@localhost:5433/theqairubook";
 
 // onnotice: the boot migration's IF NOT EXISTS statements emit a NOTICE each.
-const client = postgres(url, { max: 10, onnotice: () => {} });
+// TimeZone: DEFAULT now() on timestamp columns must write UTC whatever the server's zone.
+const client = postgres(url, {
+  max: 10,
+  onnotice: () => {},
+  connection: { TimeZone: "UTC" },
+});
 export const db = drizzle(client, { schema });
 export { schema };

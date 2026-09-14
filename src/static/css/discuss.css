@@ -1,0 +1,292 @@
+/* discuss styles */
+
+/* ---- flairs ---- */
+
+.flair {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 12px;
+  padding: 0 4px;
+  margin-right: 3px;
+  border: 1px solid #d8dfea;
+  background: #eceff5;
+  color: #555;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.flair-discussion {
+  background: #f2f2f2;
+  border-color: #d0d0d0;
+  color: #666;
+}
+
+.flair-question {
+  background: #fff1e0;
+  border-color: #f0b27a;
+  color: #b35900;
+}
+
+.flair-material {
+  background: #e9f5e4;
+  border-color: #a8d39a;
+  color: #2f6f22;
+}
+
+.flair-announcement {
+  background: #3b5998;
+  border-color: #29487d;
+  color: #fff;
+}
+
+.flair-solved {
+  background: #3a8a2e;
+  border-color: #2e7024;
+  color: #fff;
+}
+
+.post-flairs {
+  margin-bottom: 2px;
+}
+
+.pin-mark,
+.pin-note {
+  font-size: 10px;
+  margin-right: 3px;
+}
+
+.post-row.pinned {
+  background: #fbfcfe;
+}
+
+.attach-count {
+  color: #777;
+}
+
+/* ---- listing head: flair tabs + search ---- */
+
+.flair-tabs {
+  margin: -2px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #d8dfea;
+  font-size: 11px;
+}
+
+.flair-tabs a {
+  font-weight: bold;
+}
+
+.flair-tabs b.current {
+  color: #000;
+}
+
+.discuss-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 8px;
+}
+
+.discuss-search input[type="text"] {
+  flex: 1;
+  min-width: 140px;
+}
+
+.discuss-search label {
+  white-space: nowrap;
+}
+
+.discuss-search input[type="checkbox"] {
+  vertical-align: -2px;
+  margin: 0 2px 0 0;
+}
+
+.discuss-search.full {
+  margin: 0 0 4px;
+}
+
+.empty-state {
+  color: #555;
+  padding: 8px 2px;
+  line-height: 1.5;
+}
+
+.empty-state p {
+  margin: 0 0 6px;
+}
+
+/* ---- post page ---- */
+
+.post-actions .inline-form,
+.thing-actions .inline-form {
+  margin-right: 0;
+}
+
+.thing-actions .reply-box + .inline-form,
+.thing-actions .inline-form + .inline-form {
+  margin-left: 2px;
+}
+
+.thing-actions .inline-form .btn-link {
+  margin-right: 8px;
+}
+
+.post-actions .inline-form .btn-link {
+  margin-right: 0;
+}
+
+.accept-link {
+  color: #3a8a2e;
+  font-weight: bold;
+}
+
+.permalink-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 5px 0 0;
+  max-width: 420px;
+}
+
+.permalink-input {
+  flex: 1;
+  min-width: 0;
+  color: #555;
+  background: #f7f8fb;
+  font-size: 10px !important;
+}
+
+.answer-box {
+  margin: 10px 0 6px 32px;
+  border: 1px solid #a8d39a;
+  border-left: 4px solid #3a8a2e;
+  background: #f3faf0;
+  padding: 6px 8px;
+}
+
+.answer-title {
+  font-weight: bold;
+  color: #2f6f22;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.answer-box .post-text {
+  margin: 4px 0;
+}
+
+.answer-hint {
+  margin: 8px 0 0 32px;
+}
+
+.answer-badge {
+  background: #3a8a2e;
+  color: #fff;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 0 3px;
+  margin-left: 3px;
+}
+
+.comment.accepted > .thing {
+  background: #f3faf0;
+  border-left: 3px solid #3a8a2e;
+  padding: 2px 0 2px 3px;
+}
+
+.comment-form .error {
+  margin-top: 0;
+}
+
+/* ---- start a board (sidebar) ---- */
+
+.board-error {
+  margin: 4px 0;
+}
+
+/* ---- submit form ---- */
+
+.flair-choices {
+  line-height: 1.7;
+}
+
+.flair-choice {
+  display: block;
+  cursor: pointer;
+}
+
+.flair-choice input {
+  vertical-align: -2px;
+  margin: 0 2px 0 0;
+}
+
+.submit-tips {
+  padding-left: 14px;
+  margin: 2px 0;
+}
+
+/* ---- attachments (views/layout.tsx Attachments + UploadField) ---- */
+
+.attachments {
+  margin: 6px 0;
+}
+
+.attach-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.attach-images a {
+  display: block;
+  border: 1px solid #d8dfea;
+  background: #fff;
+  padding: 2px;
+}
+
+.attach-images img {
+  display: block;
+  max-width: 240px;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+.attachments.compact .attach-images img {
+  max-width: 120px;
+  max-height: 90px;
+}
+
+.attach-file {
+  padding: 2px 0;
+  word-break: break-word;
+}
+
+.attach-icon {
+  display: inline-block;
+  background: #c33;
+  color: #fff;
+  font-size: 8px;
+  font-weight: bold;
+  line-height: 11px;
+  padding: 0 3px;
+  vertical-align: 1px;
+}
+
+.upload-field {
+  margin: 4px 0;
+}
+
+.upload-field input[type="file"] {
+  max-width: 100%;
+}
+
+.upload-field .meta {
+  margin-top: 2px;
+}
+
+.reply-box .upload-field {
+  margin: 0 0 4px;
+}

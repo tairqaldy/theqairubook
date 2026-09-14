@@ -1,7 +1,15 @@
 import type { FC, Child } from "hono/jsx";
-import type { User } from "../db/schema.js";
+import type { Media, User } from "../db/schema.js";
 import { navCounts, type FriendStatus } from "../lib/social.js";
 import type { VoteTarget } from "../lib/rep.js";
+import {
+  FORM_TS_FIELD,
+  HONEYPOT_FIELD,
+  issueFormTimestamp,
+  turnstileEnabled,
+  turnstileSiteKey,
+} from "../lib/security.js";
+import { MEDIA_ACCEPT, MEDIA_LIMITS, formatBytes, mediaUrl } from "../lib/media.js";
 
 // One count query per request, shared by the top menu and the left nav.
 const countsCache = new WeakMap<User, ReturnType<typeof navCounts>>();
@@ -34,10 +42,22 @@ async function TopMenu({ user }: { user: User }) {
       </a>
       <a href="/invite">invite</a>
       <a href="/rep">rep</a>
+      {user.role === "admin" ? <a href="/admin">admin</a> : null}
       <a href="/logout">logout</a>
     </>
   );
 }
+
+// Feature stylesheets, one per area so they can evolve independently.
+const STYLESHEETS = [
+  "/static/style.css",
+  "/static/css/auth.css",
+  "/static/css/discuss.css",
+  "/static/css/people.css",
+  "/static/css/directory.css",
+  "/static/css/public.css",
+  "/static/css/admin.css",
+];
 
 export function Layout(props: {
   title: string;
@@ -52,7 +72,13 @@ export function Layout(props: {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title} | theqairubook</title>
-        <link rel="stylesheet" href="/static/style.css" />
+        <meta
+          name="description"
+          content="theqairubook — the calm, 2004-style student network for QAIRU: discussions, study materials, profiles and chat."
+        />
+        {STYLESHEETS.map((href) => (
+          <link rel="stylesheet" href={href} />
+        ))}
         <script src="/static/app.js" defer></script>
       </head>
       <body>
@@ -70,6 +96,7 @@ export function Layout(props: {
                 <>
                   <a href="/login">login</a>
                   <a href="/register">register</a>
+                  <a href="/guide">how it works</a>
                   <a href="/about">about</a>
                   <a href="/faq">faq</a>
                 </>
@@ -79,11 +106,13 @@ export function Layout(props: {
           {banner ? <div class="welcome-banner">{banner}</div> : null}
           <div class="content">{children}</div>
           <div class="footer">
-            a QAIRU student production ·{" "}
+            a <a href="https://qairuhub.com">QairuHub</a> passion project by
+            Tair Kaldybayev · <a href="/guide">how it works</a> ·{" "}
             <a href="/about">about</a> · <a href="/faq">faq</a> ·{" "}
             <a href="/terms">terms</a>
             <br />
-            Qazaq AI Research University · пр. Мәңгілік Ел 55/1, Astana
+            for students of Qazaq AI Research University · Astana · not an
+            official university service
           </div>
         </div>
       </body>
@@ -118,9 +147,12 @@ export async function LeftNav({ user }: { user: User }) {
             <Badge n={counts.pokes} />
           </a>
           <a href="/d">Discussions</a>
+          <a href="/d/saved">Saved Posts</a>
           <a href="/invite">Invite &amp; Earn Rep</a>
           <a href="/account">My Account</a>
           <a href="/privacy">Privacy</a>
+          <a href="/guide">How It Works</a>
+          {user.role === "admin" ? <a href="/admin">Admin</a> : null}
         </div>
       </div>
     </div>
@@ -197,17 +229,149 @@ export const Linkified: FC<{ text: string }> = ({ text }) => {
   );
 };
 
-export const UserLink: FC<{ user: Pick<User, "id" | "name" | "rep"> }> = ({
-  user,
-}) => (
+export const UserLink: FC<{
+  user: Pick<User, "id" | "name" | "rep"> & { claimedAt?: Date | null };
+}> = ({ user }) => (
   <>
     <a href={`/profile/${user.id}`}>
       <b>{user.name}</b>
     </a>
-    <span class="rep-chip" title="rep">
-      {user.rep}
-    </span>
+    {user.claimedAt === null ? (
+      <NotJoined />
+    ) : (
+      <span class="rep-chip" title="rep">
+        {user.rep}
+      </span>
+    )}
   </>
+);
+
+/** Marks a pre-created account from the student list that hasn't signed up. */
+export const NotJoined: FC = () => (
+  <span class="not-joined" title="On the QAIRU student list, hasn't joined theqairubook yet">
+    not joined yet
+  </span>
+);
+
+/** Honeypot + signed render time. Put inside every public form (register, login, join). */
+export const FormGuard: FC = () => (
+  <>
+    <input type="hidden" name={FORM_TS_FIELD} value={issueFormTimestamp()} />
+    <div class="hp-field" aria-hidden="true">
+      <label>
+        Leave this empty
+        <input type="text" name={HONEYPOT_FIELD} tabindex={-1} autocomplete="off" value="" />
+      </label>
+    </div>
+  </>
+);
+
+/** Cloudflare Turnstile challenge; renders nothing when keys aren't configured. */
+export const TurnstileWidget: FC = () => {
+  const siteKey = turnstileSiteKey();
+  if (!siteKey || !turnstileEnabled()) return null;
+  return (
+    <>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+      <div class="cf-turnstile" data-sitekey={siteKey} data-theme="light" data-size="flexible"></div>
+    </>
+  );
+};
+
+export const FLAIRS = {
+  discussion: "Discussion",
+  question: "Question",
+  material: "Material",
+  announcement: "Announcement",
+} as const;
+export type Flair = keyof typeof FLAIRS;
+
+export function isFlair(value: unknown): value is Flair {
+  return typeof value === "string" && Object.hasOwn(FLAIRS, value);
+}
+
+export const FlairTag: FC<{ flair: string; solved?: boolean }> = ({ flair, solved }) => {
+  const known: Flair = isFlair(flair) ? flair : "discussion";
+  return (
+    <>
+      <span class={`flair flair-${known}`}>{FLAIRS[known]}</span>
+      {solved ? <span class="flair flair-solved">✓ solved</span> : null}
+    </>
+  );
+};
+
+/** Image thumbnails + PDF links for a post or comment. */
+export const Attachments: FC<{ items: Media[] | undefined; compact?: boolean }> = ({
+  items,
+  compact,
+}) => {
+  if (!items?.length) return null;
+  const images = items.filter((m) => m.kind === "image");
+  const files = items.filter((m) => m.kind !== "image");
+  return (
+    <div class={compact ? "attachments compact" : "attachments"}>
+      {images.length ? (
+        <div class="attach-images">
+          {images.map((m) => (
+            <a href={mediaUrl(m)} target="_blank" rel="noopener" title={m.originalName}>
+              <img src={mediaUrl(m)} alt={m.originalName} loading="lazy" />
+            </a>
+          ))}
+        </div>
+      ) : null}
+      {files.map((m) => (
+        <div class="attach-file">
+          <span class="attach-icon">PDF</span>{" "}
+          <a href={mediaUrl(m)} target="_blank" rel="noopener">
+            {m.originalName}
+          </a>{" "}
+          <span class="meta">
+            {formatBytes(m.sizeBytes)} · <a href={`${mediaUrl(m)}?download=1`}>download</a>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/** File input with the limits spelled out. Form needs enctype="multipart/form-data". */
+export const UploadField: FC<{ max: number; usedBytes?: number }> = ({ max, usedBytes }) => (
+  <div class="upload-field">
+    <input type="file" name="files" multiple={max > 1} accept={MEDIA_ACCEPT} data-max-files={max} />
+    <div class="meta">
+      Up to {max} file{max === 1 ? "" : "s"}: images (JPG, PNG, GIF, WEBP) up to{" "}
+      {formatBytes(MEDIA_LIMITS.imageBytes)}, PDFs up to {formatBytes(MEDIA_LIMITS.pdfBytes)}.
+      {usedBytes !== undefined
+        ? ` You've used ${formatBytes(usedBytes)} of ${formatBytes(MEDIA_LIMITS.userQuotaBytes)}.`
+        : ""}
+    </div>
+  </div>
+);
+
+/** Copyable invite link + ready-to-send message. */
+export const InviteCopy: FC<{ id: string; link: string; message?: string }> = ({
+  id,
+  link,
+  message,
+}) => (
+  <div class="invite-copy">
+    <div class="invite-link-row">
+      <input type="text" readonly id={id} class="invite-link" value={link} data-select-on-click />
+      <button class="btn" type="button" data-copy={`#${id}`}>
+        Copy link
+      </button>
+    </div>
+    {message ? (
+      <div class="invite-link-row">
+        <textarea readonly id={`${id}-msg`} rows={2} class="invite-msg" data-select-on-click>
+          {message}
+        </textarea>
+        <button class="btn btn-gray" type="button" data-copy={`#${id}-msg`}>
+          Copy message
+        </button>
+      </div>
+    ) : null}
+  </div>
 );
 
 export const FriendButton: FC<{ userId: number; status: FriendStatus }> = ({

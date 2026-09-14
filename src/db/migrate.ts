@@ -37,6 +37,27 @@ const statements = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_user_id integer`,
   `CREATE UNIQUE INDEX IF NOT EXISTS users_referral_code ON users (referral_code)`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS native_name text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'member'`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS headline text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS looking_for text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS clubs text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS github text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS instagram text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS linkedin text NOT NULL DEFAULT ''`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS claim_locked boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at timestamp`,
+  // Accounts that existed before pre-created accounts were a thing are activated.
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema = 'public' AND table_name = 'users'
+                     AND column_name = 'claimed_at') THEN
+      ALTER TABLE users ADD COLUMN claimed_at timestamp;
+      UPDATE users SET claimed_at = member_since WHERE password_hash <> '';
+    END IF;
+  END $$`,
 
   `CREATE TABLE IF NOT EXISTS friendships (
     id serial PRIMARY KEY,
@@ -154,6 +175,65 @@ const statements = [
     created_at timestamp NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS discussion_comments_post ON discussion_comments (post_id)`,
+  `ALTER TABLE discussion_posts ADD COLUMN IF NOT EXISTS flair text NOT NULL DEFAULT 'discussion'`,
+  `ALTER TABLE discussion_posts ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE discussion_posts ADD COLUMN IF NOT EXISTS accepted_comment_id integer`,
+
+  `CREATE TABLE IF NOT EXISTS saved_posts (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL,
+    post_id integer NOT NULL,
+    created_at timestamp NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS saved_posts_unique ON saved_posts (user_id, post_id)`,
+
+  `CREATE TABLE IF NOT EXISTS media (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL,
+    post_id integer,
+    comment_id integer,
+    kind text NOT NULL,
+    mime text NOT NULL,
+    original_name text NOT NULL,
+    stored_name text NOT NULL,
+    size_bytes integer NOT NULL,
+    created_at timestamp NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS media_user ON media (user_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS media_post ON media (post_id)`,
+  `CREATE INDEX IF NOT EXISTS media_comment ON media (comment_id)`,
+  `ALTER TABLE media ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+
+  `CREATE TABLE IF NOT EXISTS email_codes (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL,
+    purpose text NOT NULL,
+    code_hash text NOT NULL,
+    attempts integer NOT NULL DEFAULT 0,
+    expires_at timestamp NOT NULL,
+    consumed_at timestamp,
+    created_at timestamp NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS email_codes_user ON email_codes (user_id, purpose)`,
+
+  // Once-only rep: a reply bonus per (author, thing, replier) and one referral per new member.
+  // Wrapped so an older database with historical duplicates still boots.
+  `DO $$ BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS rep_events_reply_once
+      ON rep_events (user_id, source_type, source_id, actor_user_id) WHERE reason = 'reply';
+  EXCEPTION WHEN others THEN RAISE NOTICE 'rep_events_reply_once skipped: %', SQLERRM;
+  END $$`,
+  `DO $$ BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS rep_events_referral_once
+      ON rep_events (source_id) WHERE reason = 'referral';
+  EXCEPTION WHEN others THEN RAISE NOTICE 'rep_events_referral_once skipped: %', SQLERRM;
+  END $$`,
+
+  `CREATE TABLE IF NOT EXISTS app_meta (
+    key text PRIMARY KEY,
+    value text NOT NULL DEFAULT '',
+    updated_at timestamp NOT NULL DEFAULT now()
+  )`,
 ];
 
 // [table, column, referenced table, on delete]
@@ -181,16 +261,27 @@ const foreignKeys: [string, string, string, string?][] = [
   ["discussion_comments", "post_id", "discussion_posts"],
   ["discussion_comments", "parent_id", "discussion_comments"],
   ["discussion_comments", "author_user_id", "users"],
+  ["saved_posts", "user_id", "users"],
+  ["saved_posts", "post_id", "discussion_posts"],
+  ["media", "user_id", "users"],
+  ["media", "post_id", "discussion_posts"],
+  ["media", "comment_id", "discussion_comments"],
+  ["email_codes", "user_id", "users"],
 ];
 
 export const DEFAULT_BOARDS: [string, string, string][] = [
   ["general", "General", "Anything and everything QAIRU."],
-  ["courses", "Courses", "Homework help, study groups, which prof to take."],
+  ["homework", "Homework Help", "Stuck on an assignment? Ask here — and help others when you can."],
+  ["coding", "Coding & Dev", "Code, bugs, tools, stacks, side projects."],
+  ["materials", "Study Materials", "Notes, cheat sheets, past papers, useful links and PDFs."],
+  ["courses", "Courses", "Which course, which prof, study groups."],
+  ["projects", "Projects & Hackathons", "Show what you're building. Find teammates."],
+  ["career", "Internships & Career", "Internships, CVs, interviews, opportunities."],
+  ["events", "Events", "Meetups, AI Fridays, hackathons, parties."],
+  ["ask", "Ask Anything", "Campus life, admin stuff, where-is-what."],
   ["housing", "Housing", "Dorms, roommates, apartments in Astana."],
-  ["events", "Events", "AI Fridays, hackathons, parties, meetups."],
   ["marketplace", "Marketplace", "Buy, sell and trade textbooks and stuff."],
-  ["memes", "Memes", "Shitposting, but make it academic."],
-  ["ask", "Ask QAIRU", "Questions for upperclassmen, faculty and staff."],
+  ["memes", "Memes & Off-topic", "Shitposting, but make it academic."],
 ];
 
 export async function ensureSchema() {
@@ -202,7 +293,8 @@ export async function ensureSchema() {
     const name = `${table}_${column}_${ref}_id_fk`;
     await db.execute(
       sql.raw(`DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${name}') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                       WHERE conname = '${name}' AND conrelid = 'public.${table}'::regclass) THEN
           ALTER TABLE ${table} ADD CONSTRAINT ${name} FOREIGN KEY (${column})
             REFERENCES ${ref}(id) ON DELETE ${onDelete ?? "no action"};
         END IF;

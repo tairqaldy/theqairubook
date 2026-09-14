@@ -1,129 +1,134 @@
 # [ theqairubook ]
 
-A student homage to **2004 thefacebook.com**, rebuilt for **Qazaq AI Research University (QAIRU)** in Astana — with a little bit of Reddit mixed in.
+**A calm, 2004-thefacebook-style student network for Qazaq AI Research University (QAIRU).**
+Discussions, study materials, homework help, profiles, friends and private chat. No feed, no algorithm, no ads.
 
-Not affiliated with Meta / Facebook. A college directory with profiles, friends, pokes, walls, private chat, **Reddit-style discussion boards**, and **rep** you earn from upvotes, replies and bringing classmates in with your personal invite link.
-
-**Live:** https://theqairubook-app-production.up.railway.app
+**Live:** https://the.qairuhub.com · a [QairuHub](https://qairuhub.com) passion project by **Tair Kaldybayev**
 
 <p align="center">
-  <img src="docs/screenshots/04-discussions.png" width="720" alt="Discussions — Reddit-style boards with votes">
+  <img src="docs/screenshots/03-discussions.png" width="720" alt="Discussions — boards, flairs, pinned announcement, solved questions">
 </p>
 
-## Features
+> Not affiliated with Meta/Facebook, and not an official QAIRU service. Screenshots use fake demo data.
 
-- **Invite links that actually work** — every member gets one permanent link (`/r/aigerim-3f9a1`). It never expires, works for any number of people, lets invited friends register with any email, auto-friends you both, and pays **+25 rep** per join
-- **Rep** — Reddit-style karma: upvotes/downvotes on your wall posts, wall replies, discussion posts and comments move your rep; getting replies earns rep too. Leaderboard + a full "how you earned it" history
-- **Discussions** — boards like `q/general`, `q/courses`, `q/housing`, `q/events`, `q/memes`; posts with optional links, **hot / new / top** sorting, threaded comments with **best / new** sorting, OP tags, soft delete. 50 rep unlocks starting your own board
-- **The Wall, threaded** — reply to any wall post (nested), vote on posts and replies, wall owner can delete
-- **Messages as chat** — conversation list with unread badges, chat bubbles, live updates without reloading, Enter to send
-- **Friends** — find people by name or email and add them in one click, confirm/ignore requests, cancel sent requests, unfriend, "people you may know"; add-friend buttons on search, social net and profiles
-- **Profiles** — picture, account/basic/contact info, courses, interests, rep, discussion stats
-- **Poke**, **The Board** activity feed (joins, referrals, friendships, wall posts, new discussions), **Search**, **Course match**, **Social net**, **Privacy** (network / friends-of-friends / friends)
+## Why
+
+Student group chats are loud and forgetful. theqairubook is the opposite: one quiet, internal place where QAIRU students can ask for help, share what they know, and find each other. Everything stays saved and searchable, and nothing is built to keep you scrolling.
+
+## What's inside
+
+- **Closed network.** Only students on the official QAIRU list can join. Every student's account is **pre-created** ("not joined yet"). You activate yours by registering with your `@qairu.edu.kz` email and a password.
+- **Friends before they join.** Send friend requests to classmates who haven't joined yet, and copy a **personal invite link** for them (it pre-fills their email). You get +25 rep when they activate.
+- **Discussions.** Boards for Homework Help, Coding & Dev, Study Materials, Courses, Projects & Hackathons, Internships & Career, Events, Ask Anything, Housing, Marketplace and Memes. Posts get a flair: **Question** (the author marks the accepted answer), **Material** or **Discussion**. There are also Reddit-style votes, threaded comments, **saved posts**, search, and pinned admin announcements. Anyone with 50 rep can start a new board.
+- **Attachments.** Images (JPG/PNG/GIF/WEBP) and PDFs on posts and comments, with strict per-person limits.
+- **Profiles you can decorate.** Photo, headline, "looking for" (study partners, hackathon team…), clubs & projects, Telegram/GitHub/Instagram/LinkedIn, courses, interests, plus a threaded wall.
+- **Private chat** with live updates, **pokes**, **friends-of-friends**, course rosters, people search (Latin or Cyrillic names).
+- **Rep:** a quiet signal of who helps others (table below), with a leaderboard and history.
+- **Onboarding.** A landing page, a full [How it works](https://the.qairuhub.com/guide) guide, FAQ, and a getting-started checklist for new members.
+- **Admin tools:** activation stats, student list import, reset an activation (impersonation reports), manage admins, recent content.
 
 ## Screenshots
 
-| Discussions thread | Profile with threaded wall |
+| Landing | Join through an invite |
 |---|---|
-| ![Thread](docs/screenshots/05-thread.png) | ![Profile](docs/screenshots/06-profile.png) |
+| ![Landing](docs/screenshots/01-landing.png) | ![Join](docs/screenshots/02-join.png) |
 
-| Invite & earn rep | Join through an invite link |
+| Question with accepted answer | Study material with a PDF |
 |---|---|
-| ![Invite](docs/screenshots/09-invite.png) | ![Join](docs/screenshots/02-join.png) |
+| ![Question](docs/screenshots/04-question.png) | ![Material](docs/screenshots/05-material.png) |
 
-| Chat | Conversations |
+| Home & getting started | Profile |
 |---|---|
-| ![Chat](docs/screenshots/08-chat.png) | ![Inbox](docs/screenshots/07-inbox.png) |
+| ![Home](docs/screenshots/06-home.png) | ![Profile](docs/screenshots/07-profile.png) |
 
-| Rep & leaderboard | The Board |
+| Classmate who hasn't joined yet | Invite classmates |
 |---|---|
-| ![Rep](docs/screenshots/10-rep.png) | ![Board](docs/screenshots/03-board.png) |
+| ![Not joined yet](docs/screenshots/08-not-joined.png) | ![Invite](docs/screenshots/09-invite.png) |
 
-| Add friends | Search |
+| Chat | How it works |
 |---|---|
-| ![Friends](docs/screenshots/11-friends.png) | ![Search](docs/screenshots/12-search.png) |
+| ![Chat](docs/screenshots/10-chat.png) | ![Guide](docs/screenshots/11-guide.png) |
 
-| Welcome |
-|---|
-| ![Welcome](docs/screenshots/01-welcome.png) |
+| Edit profile | Admin |
+|---|---|
+| ![Edit profile](docs/screenshots/13-edit-profile.png) | ![Admin](docs/screenshots/12-admin.png) |
 
-## How rep works
+## Rep
 
 | Rep | When |
 |---|---|
-| **+25** | Someone joins through your invite link (max 10 payouts per 24h) |
-| **+1 / −1** | Someone upvotes / downvotes your wall post, wall reply, discussion post or comment |
-| **+1** | Someone replies to your post or comment (once per person per post) |
-| **50** | Rep needed to start your own discussion board |
+| **+25** | A classmate activates their account through your invite link (max 10 per 24h) |
+| **+1 / −1** | Someone upvotes / downvotes your wall post, reply, discussion post or comment |
+| **+1** | Someone new replies to your post or comment (once per person) |
+| **+5** | Your comment is marked as the answer to a question |
+| **50** | Rep needed to start your own board |
 
-You can't vote on your own content. Every change is recorded in a `rep_events` ledger, so each user's rep always equals the sum of their history.
+You can't vote on your own content. Every change is written to a `rep_events` ledger, so a user's rep always equals the sum of their history.
+
+## Limits & safety
+
+| | |
+|---|---|
+| Images | up to 5 MB each |
+| PDFs | up to 10 MB each |
+| Files per post / comment | 4 / 2 |
+| Storage per person | 50 MB |
+| Uploads per person | 20 per 24 hours |
+| Total upload storage | 3 GB cap |
+
+- **Mailbox proof:** when email is configured, activating an account (and resetting a password) needs a 6-digit code sent to the student's `@qairu.edu.kz` inbox. Codes are single-use, expire in 15 minutes and allow 5 tries.
+- **Impersonation reports:** an admin can reset & lock an account and send the real student a one-time personal activation link. Admins can also suspend accounts and remove posts, comments and wall posts.
+- Cloudflare **Turnstile** plus a honeypot and a signed timing check on register and login.
+- Rate limits on login, registration, posting, commenting, messaging, friend requests and uploads.
+- scrypt password hashes. Signed session cookies carry a **session version**, so changing your password or an admin reset logs out every other session.
+- Uploads are identified by their **magic bytes** (never by extension), served members-only with `nosniff`, and sandboxed.
+- Profile photos and attachments are visible only to logged-in members. Security headers (`X-Frame-Options`, `Referrer-Policy`, HSTS…) are on everywhere.
+- The student list is personal data. It is **never committed**: it's loaded through a private launch file or the admin import page.
 
 ## Stack
 
-- [Hono](https://hono.dev) + JSX — server-rendered HTML, one tiny progressive-enhancement script (`src/static/app.js`); every form still works with JS off
-- Postgres + [Drizzle ORM](https://orm.drizzle.team)
-- scrypt password hashes + signed session cookie (no auth-as-a-service)
-- Vintage table layout, `#3B5998` chrome
+- [Hono](https://hono.dev) + JSX: server-rendered HTML with one small progressive-enhancement script. Every form works without JS.
+- Postgres + [Drizzle ORM](https://orm.drizzle.team); schema migrates itself on boot (`src/db/migrate.ts`)
+- Deployed on [Railway](https://railway.com); DNS on Cloudflare
+- Vintage 700px table layout, `#3B5998` chrome
 
-## Quick start
+## Run it locally
 
 ```bash
 git clone https://github.com/tairqaldy/theqairubook.git
 cd theqairubook
 npm install
-npm run db:up          # starts Postgres in Docker on localhost:5433
-npm run db:seed        # creates tables + 8 fake QAIRU people, discussions, votes, chats
-npm run dev            # http://localhost:8787
+npm run db:up      # Postgres in Docker on localhost:5433
+npm run db:seed    # fake students, discussions, votes, attachments, chats
+npm run dev        # http://localhost:8787
 ```
 
-The server creates/updates its own tables on startup (`src/db/migrate.ts`), so `npm run db:push` is optional.
-
-### Seed logins
-
-All seed accounts use password `qairu123`.
-
-| Email | Name |
-|---|---|
-| `aigerim.nurlanova@qairu.edu.kz` | Aigerim Nurlanova |
-| `dias.bekmuratov@qairu.edu.kz` | Dias Bekmuratov |
-| `madina.satpayeva@qairu.edu.kz` | Madina Satpayeva |
-| … | (see [`src/db/seed.ts`](src/db/seed.ts)) |
-
-Register your own account with any `*@qairu.edu.kz` address, or open a member's **invite link** from their `invite` tab — that works with any email.
+Demo login (fake data only): `aigerim.nurlanova@qairu.edu.kz` / `qairu123` (admin). The seed also creates classmates who haven't joined yet, so you can try activating one at `/register`.
 
 ## Config
 
-Copy `.env.example` → `.env` for local dev:
-
 | Variable | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | `postgres://qairu:qairu@localhost:5433/theqairubook` | Railway injects this in production |
-| `SESSION_SECRET` | — | **Must** be a long random string in production |
-| `ALLOWED_EMAIL_DOMAINS` | `qairu.edu.kz` | Comma-separated; only applies to open `/register`, not invite links |
-| `PUBLIC_URL` | auto | Origin used in invite links. Auto-detected from `X-Forwarded-*` headers / `RAILWAY_PUBLIC_DOMAIN`; set it when you add a custom domain |
-| `APP_TIMEZONE` | `Asia/Almaty` | Timezone for displayed dates and chat times (Astana, UTC+5) |
-| `PORT` | `8787` | Railway overrides this automatically |
-| `UPLOAD_DIR` | `./uploads` | Profile photo storage (`/data/uploads` on Railway) |
+| `DATABASE_URL` | `postgres://qairu:qairu@localhost:5433/theqairubook` | |
+| `SESSION_SECRET` | dev default | **required** in production |
+| `ALLOWED_EMAIL_DOMAINS` | `qairu.edu.kz` | |
+| `PUBLIC_URL` | auto | origin for invite links, e.g. `https://the.qairuhub.com` |
+| `REDIRECT_TO_PUBLIC_URL` | off | `1` = 301 other hostnames to `PUBLIC_URL` |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | unset | anti-bot widget is enabled when both are set |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_EMAIL_API_TOKEN` | unset | Cloudflare Email Service; turns on email codes for activation & password reset |
+| `RESEND_API_KEY` | unset | alternative email provider |
+| `EMAIL_FROM` | `theqairubook <no-reply@qairuhub.com>` | sender address |
+| `EMAIL_DEV_LOG` | off | `1` prints emails to the server log (local dev only) |
+| `TRUST_CF_CONNECTING_IP` | off | `1` only if the hostname is proxied through Cloudflare |
+| `APP_TIMEZONE` | `Asia/Almaty` | displayed times |
+| `UPLOAD_DIR` | `./uploads` | photos + attachments (`/data/uploads` on Railway) |
+| `MEDIA_MAX_IMAGE_MB` / `MEDIA_MAX_PDF_MB` / `MEDIA_USER_QUOTA_MB` / `MEDIA_DAILY_UPLOADS` / `MEDIA_GLOBAL_CAP_MB` | 5 / 10 / 50 / 20 / 3000 | upload limits |
+| `LAUNCH_FILE` | `./private/launch.json` | one-time launch bootstrap (see [DEPLOY.md](DEPLOY.md)) |
 
-## Main routes
+## Deploy
 
-| Route | What |
-|---|---|
-| `/r/:code` | Join via someone's permanent invite link (legacy `/join/:token` links still work) |
-| `/d`, `/d/:board`, `/d/:board/:postId` | Discussions front page, board, post + comments |
-| `/messages`, `/messages/with/:userId` | Conversations, chat thread |
-| `/friends?find=` | Friends, requests, find & add |
-| `/rep` | Your rep, rules, leaderboard, history |
-| `/invite` | Your invite link and referrals |
-| `/healthz` | Health check |
+See [DEPLOY.md](DEPLOY.md) for the Railway service, the custom domain on Cloudflare, Turnstile, and loading the student list.
 
-## Deployment
+## Credits
 
-Single Node/Hono server + Postgres on **Railway**. Push to `main` / `railway up`; the schema migrates itself on boot. See [DEPLOY.md](DEPLOY.md).
-
-## Design notes
-
-- Fixed **700px** centered table layout
-- Header / borders `#3B5998`, box titles `#6D84B4` / `#D8DFEA`
-- Wordmark `[ theqairubook ]`, boards are `q/something`
-- Footer: `a QAIRU student production`
+Made by **Tair Kaldybayev** as a [QairuHub](https://qairuhub.com) passion project, for the students of QAIRU. Inspired by the 2004 original.

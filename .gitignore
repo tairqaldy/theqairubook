@@ -7,3 +7,6 @@ uploads/*
 .DS_Store
 drizzle/meta/
 .claude/
+
+# Private launch data (student list) — never commit
+private/

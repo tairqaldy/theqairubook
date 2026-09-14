@@ -1,0 +1,110 @@
+/* directory styles: home board, search, social net, messages, rep */
+
+/* "N of M students have joined" */
+.stats-line {
+  margin: 0 0 8px;
+  padding: 4px 8px;
+  background: #f7f8fb;
+  border: 1px solid #d8dfea;
+  color: #333;
+}
+
+.stats-line b {
+  color: #3b5998;
+}
+
+.stats-line.small {
+  margin: 6px 0;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
+/* ---- announcements (pinned discussion posts) ---- */
+
+.announce-box {
+  border-color: #e2c822;
+}
+
+.announce-box .box-title {
+  background: #fff9d7;
+  color: #333;
+  border-bottom: 1px solid #e2c822;
+}
+
+ul.announce-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul.announce-list li {
+  padding: 3px 0;
+  border-bottom: 1px solid #f2eab0;
+}
+
+ul.announce-list li:last-child {
+  border-bottom: 0;
+}
+
+ul.announce-list a {
+  font-weight: bold;
+}
+
+/* ---- getting started checklist ---- */
+
+ul.checklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul.checklist li {
+  padding: 3px 0;
+}
+
+ul.checklist .check-mark {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  font-weight: bold;
+  color: #999;
+}
+
+ul.checklist li.done .check-mark {
+  color: #3a8a2e;
+}
+
+ul.checklist li.done .check-label {
+  color: #777;
+  text-decoration: line-through;
+}
+
+/* ---- sidebar: newest members ---- */
+
+ul.newest-members {
+  margin: 0 0 4px;
+  padding-left: 14px;
+  font-size: 12px;
+}
+
+ul.newest-members li {
+  margin-bottom: 2px;
+}
+
+ul.newest-members .meta {
+  font-size: 10px;
+}
+
+/* ---- messages ---- */
+
+.chat-error {
+  margin: 4px 8px;
+}
+
+/* ---- rep ---- */
+
+.rep-why {
+  margin: 0 0 6px;
+  font-style: italic;
+  color: #555;
+}

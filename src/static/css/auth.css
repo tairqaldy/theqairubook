@@ -1,0 +1,98 @@
+/* auth styles: register, login, referral join page, change password */
+
+/* Honeypot from <FormGuard/>: invisible to people, still in the DOM for bots. */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.qairu-only {
+  background: #fff9d7;
+  border: 1px solid #e2c822;
+  padding: 6px 8px;
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.qairu-only b:first-child {
+  color: #3b5998;
+}
+
+.form-hint {
+  display: block;
+  color: #777;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.error .form-hint.error-hint {
+  font-weight: normal;
+  color: #555;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.auth-form .field-label {
+  vertical-align: top;
+  padding-top: 5px;
+}
+
+.auth-form .cf-turnstile {
+  margin: 8px 0 0 4px;
+  max-width: 320px;
+}
+
+.join-main {
+  width: 62%;
+  padding-right: 12px;
+}
+
+.invite-greeting {
+  font-size: 13px;
+  font-weight: bold;
+  color: #3b5998;
+  margin: 0 0 8px;
+}
+
+/* Emailed codes (activation, password reset) */
+.sent-to {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.auth-form .code-input {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 6px;
+  width: 9em;
+  max-width: 100%;
+  padding: 3px 6px;
+}
+
+.resend-form {
+  margin: 10px 0 0;
+  color: #777;
+  font-size: 10px;
+}
+
+.resend-form .btn-link {
+  text-decoration: underline;
+}
+
+.forgot-link {
+  margin: 6px 0 0 4px;
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .join-main,
+  .join-main + td {
+    display: block;
+    width: auto;
+    padding-right: 0;
+  }
+}

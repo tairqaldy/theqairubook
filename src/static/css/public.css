@@ -1,0 +1,160 @@
+/* public styles: landing, guide, about, faq, terms */
+
+.pub-hero {
+  background: #eceff5;
+  border: 1px solid #d8dfea;
+  border-left: 4px solid #3b5998;
+  color: #333333;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.pub-hero b {
+  color: #3b5998;
+}
+
+.pub-cols td.pub-main {
+  width: 62%;
+  padding-right: 12px;
+}
+
+.pub-cols td.pub-side {
+  width: 38%;
+}
+
+/* live stats */
+.pub-stat {
+  padding: 3px 0;
+  border-bottom: 1px solid #eceff5;
+}
+
+.pub-stat:last-of-type {
+  border-bottom: none;
+}
+
+.pub-num {
+  color: #3b5998;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* numbered steps */
+ol.pub-steps {
+  margin: 8px 0;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: pub-step;
+}
+
+ol.pub-steps li {
+  counter-increment: pub-step;
+  position: relative;
+  padding: 3px 0 3px 26px;
+  margin-bottom: 4px;
+  line-height: 1.45;
+}
+
+ol.pub-steps li::before {
+  content: counter(pub-step);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  background: #3b5998;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.btn-row a.btn {
+  margin-right: 6px;
+}
+
+/* table of contents */
+.pub-intro {
+  margin: 0 0 10px;
+  color: #333333;
+}
+
+ol.pub-toc {
+  margin: 4px 0;
+  padding-left: 22px;
+  columns: 2;
+  column-gap: 20px;
+}
+
+ol.pub-toc li {
+  padding: 1px 0;
+  break-inside: avoid;
+}
+
+.pub-section {
+  scroll-margin-top: 8px;
+}
+
+.pub-top {
+  text-align: right;
+  font-size: 10px;
+  margin-top: 6px;
+}
+
+/* info tables */
+.pub-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d8dfea;
+  margin: 8px 0;
+}
+
+.pub-table th {
+  background: #eceff5;
+  color: #3b5998;
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid #d8dfea;
+}
+
+.pub-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #eceff5;
+  vertical-align: top;
+}
+
+.pub-nowrap {
+  white-space: nowrap;
+}
+
+/* faq */
+.pub-qa {
+  scroll-margin-top: 8px;
+}
+
+.pub-qa p {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .pub-cols,
+  .pub-cols tbody,
+  .pub-cols tr,
+  .pub-cols td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .pub-cols td.pub-main {
+    padding-right: 0;
+  }
+
+  ol.pub-toc {
+    columns: 1;
+  }
+
+  .pub-nowrap {
+    white-space: normal;
+  }
+}

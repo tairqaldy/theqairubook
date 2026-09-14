@@ -101,16 +101,19 @@ export async function friendIds(userId: number): Promise<number[]> {
   );
 }
 
+/** Friends of my friends who aren't me or already my friends — one query. */
 export async function friendsOfFriends(userId: number): Promise<number[]> {
-  const mine = await friendIds(userId);
-  const set = new Set<number>();
-  for (const fid of mine) {
-    const theirs = await friendIds(fid);
-    for (const tid of theirs) {
-      if (tid !== userId && !mine.includes(tid)) set.add(tid);
-    }
-  }
-  return [...set];
+  const rows = await db.execute<{ id: number }>(sql`
+    WITH edges AS (
+      SELECT from_user_id AS a, to_user_id AS b FROM friendships WHERE status = 'accepted'
+      UNION ALL
+      SELECT to_user_id, from_user_id FROM friendships WHERE status = 'accepted'
+    ),
+    mine AS (SELECT b AS id FROM edges WHERE a = ${userId})
+    SELECT DISTINCT e.b AS id
+      FROM edges e JOIN mine m ON e.a = m.id
+     WHERE e.b <> ${userId} AND e.b NOT IN (SELECT id FROM mine)`);
+  return rows.map((r) => Number(r.id));
 }
 
 export async function mutualFriends(
@@ -152,6 +155,28 @@ export async function addBoardEvent(
     kind,
     detail,
   });
+}
+
+/** Gives older accounts a permanent referral code the first time they need one. */
+export async function ensureReferralCode(user: User): Promise<User> {
+  if (user.referralCode) return user;
+  const [updated] = await db
+    .update(users)
+    .set({ referralCode: makeReferralCode(user.name) })
+    .where(eq(users.id, user.id))
+    .returning();
+  return updated ?? user;
+}
+
+/** How many accounts on the student list have been activated. */
+export async function joinedStats(): Promise<{ joined: number; total: number }> {
+  const [row] = await db
+    .select({
+      joined: sql<number>`count(*) filter (where ${users.claimedAt} is not null)::int`,
+      total: sql<number>`count(*)::int`,
+    })
+    .from(users);
+  return { joined: Number(row?.joined ?? 0), total: Number(row?.total ?? 0) };
 }
 
 export function makeReferralCode(name: string): string {

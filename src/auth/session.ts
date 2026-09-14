@@ -1,37 +1,51 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+// Never run a deployed instance on the public dev default: sessions would be forgeable.
+if (!process.env.SESSION_SECRET && (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === "production")) {
+  throw new Error("SESSION_SECRET must be set in production");
+}
+
 const SECRET =
   process.env.SESSION_SECRET ?? "theqairubook-local-dev-secret-change-in-prod";
 
-function sign(payload: string): string {
+export function sign(payload: string): string {
   return createHmac("sha256", SECRET).update(payload).digest("base64url");
 }
 
-export function encodeSession(userId: number): string {
-  const payload = `${userId}.${Date.now()}`;
-  return `${payload}.${sign(payload)}`;
-}
-
-export function decodeSession(token: string | undefined): number | null {
-  if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [userIdStr, ts, sig] = parts;
-  const payload = `${userIdStr}.${ts}`;
+export function verifySignature(payload: string, sig: string): boolean {
   const expected = sign(payload);
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    return a.length === b.length && timingSafeEqual(a, b);
   } catch {
-    return null;
+    return false;
   }
+}
+
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Token: <userId>.<sessionVersion>.<issuedAtMs>.<signature>
+export function encodeSession(userId: number, version: number): string {
+  const payload = `${userId}.${version}.${Date.now()}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export function decodeSession(
+  token: string | undefined
+): { userId: number; version: number } | null {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 4) return null;
+  const [userIdStr, versionStr, ts, sig] = parts;
+  if (!verifySignature(`${userIdStr}.${versionStr}.${ts}`, sig)) return null;
   const userId = Number(userIdStr);
-  if (!Number.isFinite(userId) || userId < 1) return null;
-  // 30 days
+  const version = Number(versionStr);
+  if (!Number.isInteger(userId) || userId < 1) return null;
+  if (!Number.isInteger(version) || version < 0) return null;
   const age = Date.now() - Number(ts);
-  if (!Number.isFinite(age) || age > 30 * 24 * 60 * 60 * 1000) return null;
-  return userId;
+  if (!Number.isFinite(age) || age < 0 || age > MAX_AGE_MS) return null;
+  return { userId, version };
 }
 
 export function allowedEmail(email: string): boolean {

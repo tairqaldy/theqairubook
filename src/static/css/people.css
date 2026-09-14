@@ -1,0 +1,289 @@
+/* people styles: profiles, edit profile, account, friends, invite */
+
+/* ---- "not joined yet" badge (used site-wide by <NotJoined/>) ---- */
+
+.not-joined {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border: 1px dashed #aab4c8;
+  background: #f7f8fb;
+  color: #777;
+  font-size: 9px;
+  font-weight: normal;
+  line-height: 13px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
+/* ---- profile header ---- */
+
+.profile-head {
+  border: 1px solid #d8dfea;
+  background: #f7f8fb;
+  padding: 7px 9px;
+  margin-bottom: 10px;
+}
+
+.profile-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #3b5998;
+}
+
+.native-name {
+  color: #555;
+  margin-top: 1px;
+}
+
+.profile-headline {
+  margin-top: 4px;
+  font-style: italic;
+  color: #333;
+}
+
+.unclaimed-profile {
+  border-style: dashed;
+  background: #fbfbfb;
+}
+
+.unclaimed-profile p {
+  margin: 6px 0 0;
+  color: #555;
+}
+
+.pre-line {
+  white-space: pre-line;
+}
+
+/* ---- chips & links ---- */
+
+.chips {
+  margin: 2px 0 6px;
+  line-height: 20px;
+}
+
+.chip {
+  display: inline-block;
+  background: #eceff5;
+  border: 1px solid #d8dfea;
+  color: #3b5998;
+  padding: 0 6px;
+  margin: 0 4px 2px 0;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.links-row {
+  margin: 2px 0 6px;
+  line-height: 18px;
+}
+
+.links-row .link-item {
+  display: inline-block;
+  margin-right: 12px;
+  white-space: nowrap;
+}
+
+/* ---- edit profile ---- */
+
+input.wide-input {
+  width: 95%;
+}
+
+.edit-thumb {
+  display: block;
+  max-width: 60px;
+  max-height: 60px;
+  border: 1px solid #d8dfea;
+  margin-bottom: 4px;
+}
+
+.checkbox-grid label {
+  display: inline-block;
+  width: 49%;
+  padding: 1px 0;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+.onboarding {
+  border: 1px solid #d8dfea;
+  background: #fff9d7;
+  padding: 7px 9px;
+  margin-bottom: 10px;
+}
+
+ul.onboarding-list {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+}
+
+ul.onboarding-list li {
+  padding: 2px 0;
+}
+
+ul.onboarding-list .check {
+  display: inline-block;
+  width: 14px;
+  color: #3b5998;
+  font-weight: bold;
+}
+
+ul.onboarding-list li.done b {
+  color: #777;
+  text-decoration: line-through;
+}
+
+ul.onboarding-list li.done .check {
+  color: #3a8a2e;
+}
+
+/* ---- account ---- */
+
+.usage-bar {
+  height: 8px;
+  border: 1px solid #8496ba;
+  background: #f7f8fb;
+  margin: 4px 0 6px;
+}
+
+.usage-fill {
+  height: 100%;
+  background: #3b5998;
+}
+
+.uploads-scroll {
+  overflow-x: auto;
+  margin-top: 6px;
+}
+
+table.uploads-table {
+  width: 100%;
+}
+
+.uploads-table th {
+  text-align: left;
+  font-size: 11px;
+  color: #555;
+}
+
+.uploads-table td {
+  vertical-align: middle;
+}
+
+.uploads-table td.nowrap {
+  white-space: nowrap;
+}
+
+.uploads-table .upload-file {
+  word-break: break-word;
+}
+
+.upload-thumb {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid #d8dfea;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.upload-pdf {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  text-align: center;
+  border: 1px solid #d8dfea;
+  background: #f7f8fb;
+  color: #a33;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ---- suspended profiles ---- */
+
+.suspended-note {
+  border: 1px solid #ddd3a8;
+  background: #fff9d7;
+  color: #555;
+  padding: 5px 9px;
+  margin: 0 0 10px;
+}
+
+.suspended-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid #c77;
+  background: #fbeaea;
+  color: #a33;
+  font-size: 9px;
+  font-weight: normal;
+  line-height: 13px;
+  vertical-align: 2px;
+}
+
+/* ---- invite ---- */
+
+.invite-copy textarea.invite-msg {
+  flex: 1;
+  width: auto;
+  resize: vertical;
+  background: #f7f8fb;
+}
+
+.share-row {
+  margin: 4px 0 0;
+}
+
+.stat-of {
+  font-size: 11px;
+  font-weight: normal;
+  color: #777;
+}
+
+.invite-rows td {
+  vertical-align: top;
+}
+
+.invite-details {
+  margin-top: 3px;
+}
+
+.invite-details summary {
+  display: inline;
+  cursor: pointer;
+  color: #3b5998;
+  font-size: 10px;
+  list-style: none;
+}
+
+.invite-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.invite-details summary:hover {
+  text-decoration: underline;
+}
+
+.invite-details[open] summary {
+  font-weight: bold;
+}
+
+.invite-details .invite-link-row {
+  margin: 4px 0;
+}
+
+.invite-details input.invite-link {
+  font-size: 11px;
+}
