@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "./index.js";
 import {
   users,
@@ -8,10 +8,207 @@ import {
   boardEvents,
   pokes,
   messages,
+  boards,
+  discussionPosts,
+  discussionComments,
 } from "./schema.js";
 import { hashPassword } from "../auth/password.js";
+import { ensureSchema } from "./migrate.js";
+import { castVote, awardReply, awardReferral } from "../lib/rep.js";
 
 const SEED_PASSWORD = "qairu123";
+
+const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
+
+// Discussions, threaded comments, votes, wall replies, chats and a referral —
+// all through the real rep functions so scores and rep stay consistent.
+async function seedCommunity(ids: number[]) {
+  const [aigerim, dias, madina, yerasyl, sara, nursultan, prof, zarina] = ids;
+  if (!zarina) return;
+  const [already] = await db.select().from(discussionPosts).limit(1);
+  if (already) return;
+
+  const boardRows = await db.select().from(boards);
+  const board = (slug: string) => boardRows.find((b) => b.slug === slug)!.id;
+
+  const posts = [
+    {
+      board: "courses",
+      author: madina,
+      h: 20,
+      title: "Linear Algebra midterm study group — Thursday 18:00 at B2.2?",
+      body: "Going through eigenvalues + SVD past papers. Bring snacks, I'll bring the whiteboard markers.",
+    },
+    {
+      board: "events",
+      author: aigerim,
+      h: 9,
+      title: "AI Fridays this week: build an agent in 90 minutes 🤖",
+      body: "Teams of 2-3. Best demo gets pizza and eternal glory. Sign up in the comments.",
+    },
+    {
+      board: "ask",
+      author: sara,
+      h: 30,
+      title: "Which is harder: Discrete Math or Linear Algebra?",
+      body: "Picking electives for next semester and everyone gives me a different answer.",
+    },
+    {
+      board: "housing",
+      author: yerasyl,
+      h: 52,
+      title: "Looking for a roommate near EXPO for spring",
+      body: "2-room flat, 10 min walk to campus. Quiet, cooks plov on weekends.",
+    },
+    {
+      board: "memes",
+      author: dias,
+      h: 4,
+      title: "When the model finally converges at 3am and you have class at 9",
+      body: "",
+    },
+    {
+      board: "marketplace",
+      author: nursultan,
+      h: 70,
+      title: "Selling: Deep Learning (Goodfellow) hardcover, barely used",
+      body: "8000₸, can meet at the library.",
+    },
+    {
+      board: "general",
+      author: prof,
+      h: 14,
+      title: "Office hours moved to Wednesday 15:00 this week",
+      body: "Room 3.14 as usual. Bring your project questions.",
+    },
+  ];
+
+  const postIds: Record<string, number> = {};
+  for (const p of posts) {
+    const [row] = await db
+      .insert(discussionPosts)
+      .values({
+        boardId: board(p.board),
+        authorUserId: p.author,
+        title: p.title,
+        body: p.body,
+        createdAt: hoursAgo(p.h),
+      })
+      .returning();
+    postIds[p.board] = row.id;
+    await db.insert(boardEvents).values({
+      actorUserId: p.author,
+      kind: "discussion",
+      detail: JSON.stringify({ postId: row.id, slug: p.board, title: p.title }),
+      createdAt: hoursAgo(p.h),
+    });
+  }
+
+  async function comment(
+    post: string,
+    author: number,
+    body: string,
+    h: number,
+    parent?: { id: number; authorUserId: number }
+  ) {
+    const postId = postIds[post];
+    const [row] = await db
+      .insert(discussionComments)
+      .values({ postId, parentId: parent?.id ?? null, authorUserId: author, body, createdAt: hoursAgo(h) })
+      .returning();
+    await db
+      .update(discussionPosts)
+      .set({ commentCount: sql`${discussionPosts.commentCount} + 1` })
+      .where(eq(discussionPosts.id, postId));
+    const [op] = await db.select().from(discussionPosts).where(eq(discussionPosts.id, postId));
+    if (parent) await awardReply(parent.authorUserId, author, "comment", parent.id);
+    else await awardReply(op.authorUserId, author, "post", postId);
+    return row;
+  }
+
+  const e1 = await comment("events", dias, "Me + Yerasyl are in. Can we use any framework?", 8);
+  const e2 = await comment("events", aigerim, "Anything goes, as long as it runs live on stage 😄", 7, e1);
+  await comment("events", yerasyl, "Bringing my Raspberry Pi. No promises it survives.", 6, e2);
+  const e3 = await comment("events", madina, "Is there a speech track? I'd love to demo a voice agent.", 5);
+  await comment("events", aigerim, "Yes! Speech demos welcome.", 5, e3);
+  await comment("events", nursultan, "Count me in, looking for a teammate who knows CV.", 3);
+
+  const c1 = await comment("courses", sara, "I'm in. Can we also cover determinants?", 19);
+  await comment("courses", madina, "Sure, first 30 minutes on determinants.", 18, c1);
+  await comment("courses", dias, "Will there be recordings for people in the late lab?", 17);
+
+  const a1 = await comment("ask", nursultan, "Discrete is harder to start, LinAlg is harder to finish.", 28);
+  await comment("ask", sara, "That is somehow the most helpful answer so far", 27, a1);
+  await comment("ask", prof, "Take Discrete first — proofs make Linear Algebra much easier.", 25);
+
+  await comment("memes", madina, "loss.backward() and so did my sleep schedule", 3);
+  await comment("general", zarina, "Registrar note: add/drop deadline is Friday too.", 12);
+
+  const allPosts = await db.select().from(discussionPosts);
+  const allComments = await db.select().from(discussionComments);
+  const voters = [aigerim, dias, madina, yerasyl, sara, nursultan, prof, zarina];
+  // Deterministic pseudo-random votes, weighted toward upvotes.
+  let seed = 7;
+  const rand = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  for (const p of allPosts) {
+    for (const v of voters) {
+      if (v !== p.authorUserId && rand() < 0.8) await castVote(v, "post", p.id, rand() < 0.9 ? 1 : -1);
+    }
+  }
+  for (const cm of allComments) {
+    for (const v of voters) {
+      if (v !== cm.authorUserId && rand() < 0.45) await castVote(v, "comment", cm.id, rand() < 0.88 ? 1 : -1);
+    }
+  }
+
+  // Wall replies + votes
+  const walls = await db.select().from(wallPosts);
+  const fridays = walls.find((w) => w.body.startsWith("See you at AI Fridays"));
+  if (fridays) {
+    const [r] = await db
+      .insert(wallPosts)
+      .values({
+        profileUserId: fridays.profileUserId,
+        authorUserId: aigerim,
+        parentId: fridays.id,
+        body: "Obviously! Save me a seat near the projector.",
+      })
+      .returning();
+    await awardReply(fridays.authorUserId, aigerim, "wall", fridays.id);
+    await db.insert(wallPosts).values({
+      profileUserId: fridays.profileUserId,
+      authorUserId: sara,
+      parentId: r.id,
+      body: "Can I join you two?",
+    });
+    await awardReply(aigerim, sara, "wall", r.id);
+    for (const v of [madina, sara, yerasyl]) await castVote(v, "wall", fridays.id, 1);
+    for (const v of [dias, madina]) await castVote(v, "wall", r.id, 1);
+  }
+
+  // A chat between Aigerim and Madina
+  const chat: [number, number, string, number][] = [
+    [madina, aigerim, "hey! are you coming to the LinAlg study group?", 26],
+    [aigerim, madina, "yes!! can I bring Dias?", 25.9],
+    [madina, aigerim, "of course, the more the merrier", 25.8],
+    [aigerim, madina, "also do you have the SVD notes from Tuesday?", 2],
+    [madina, aigerim, "sending them now 📎 check the course board too", 1.9],
+  ];
+  for (const [from, to, body, h] of chat) {
+    await db.insert(messages).values({ fromUserId: from, toUserId: to, body, read: h > 1.95, createdAt: hoursAgo(h) });
+  }
+
+  // Sara joined through Aigerim's invite link
+  await db.update(users).set({ referredByUserId: aigerim }).where(eq(users.id, sara));
+  await awardReferral(aigerim, sara);
+  await db.insert(boardEvents).values({
+    actorUserId: sara,
+    targetUserId: aigerim,
+    kind: "referral",
+    detail: "+25 rep",
+    createdAt: hoursAgo(40),
+  });
+}
 
 const people = [
   {
@@ -146,6 +343,7 @@ const people = [
 
 async function main() {
   console.log("Seeding theqairubook…");
+  await ensureSchema();
   const hash = hashPassword(SEED_PASSWORD);
   const created: { id: number; name: string }[] = [];
 
@@ -269,6 +467,8 @@ async function main() {
       });
     }
   }
+
+  await seedCommunity(created.map((p) => p.id));
 
   console.log(`Seeded ${created.length} people.`);
   console.log(`Password for all seed accounts: ${SEED_PASSWORD}`);

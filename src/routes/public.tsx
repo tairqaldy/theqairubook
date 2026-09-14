@@ -22,8 +22,13 @@ publicRoutes.get("/", (c) => {
                 <li>Search for people at your school</li>
                 <li>Find out who are in your classes</li>
                 <li>Look up your friends' friends</li>
-                <li>See a visualization of your social network</li>
+                <li>Discuss anything on the QAIRU boards and earn rep</li>
+                <li>Chat privately with classmates</li>
               </ul>
+              <p class="meta">
+                Got an invite link from a friend? Open it to join with any
+                email.
+              </p>
               <div class="btn-row">
                 <a href="/register">
                   <button class="btn" type="button">
@@ -69,9 +74,11 @@ publicRoutes.get("/about", (c) => {
           <b>Qazaq AI Research University (QAIRU)</b> in Astana.
         </p>
         <p>
-          Registration is limited to <code>@qairu.edu.kz</code> email addresses.
-          Use your real name. Find classmates, add friends, poke people, write
-          on walls, and browse the social net — just like the old days.
+          Registration is limited to <code>@qairu.edu.kz</code> email addresses,
+          or a personal invite link from a member. Use your real name. Find
+          classmates, add friends, poke people, write on walls, chat, argue on
+          the discussion boards and earn rep — just like the old days, plus a
+          little Reddit.
         </p>
         <p>
           This is an independent student project. It is not affiliated with Meta
@@ -89,7 +96,17 @@ publicRoutes.get("/faq", (c) => {
         <p>
           <b>Who can join?</b>
           <br />
-          Anyone with a valid <code>@qairu.edu.kz</code> email address.
+          Anyone with a valid <code>@qairu.edu.kz</code> email address — or
+          anyone who opens a member's personal invite link.
+        </p>
+        <hr class="thin" />
+        <p>
+          <b>What is rep?</b>
+          <br />
+          Rep is your standing on theqairubook. You earn it when classmates
+          upvote your wall posts, replies, discussion posts and comments, when
+          someone new replies to you, and when people join through your invite
+          link. See the leaderboard under <b>rep</b>.
         </p>
         <hr class="thin" />
         <p>

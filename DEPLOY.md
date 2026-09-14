@@ -26,8 +26,10 @@ dashboard):
 | `SESSION_SECRET` | a long random string (`openssl rand -hex 32`) — **never** reuse the local dev default |
 | `ALLOWED_EMAIL_DOMAINS` | `qairu.edu.kz` |
 | `UPLOAD_DIR` | `/data/uploads` (see volume below) |
+| `PUBLIC_URL` | optional — e.g. `https://theqairubook.kz` once you add a custom domain. Without it, invite links use the `X-Forwarded-Host`/`X-Forwarded-Proto` Railway sends (always `https://…`) |
+| `APP_TIMEZONE` | optional — defaults to `Asia/Almaty` (Astana time) |
 
-`PORT` and `DATABASE_URL` are provided by Railway automatically.
+`PORT`, `DATABASE_URL` and `RAILWAY_PUBLIC_DOMAIN` are provided by Railway automatically.
 
 ## 3. Persistent volume for profile photos
 
@@ -42,15 +44,15 @@ Mount it at `/data` and keep `UPLOAD_DIR=/data/uploads` so photos survive
 deploys. (Swap this for Cloudflare R2 or Railway's own object storage later
 if photo volume grows — not needed to launch.)
 
-## 4. Push schema + seed
+## 4. Schema
 
-Once the Postgres plugin exists, run the same scripts against it from your
-machine using Railway's env:
+Nothing to run. On every boot the server applies `src/db/migrate.ts`, which
+creates missing tables/columns/indexes with `IF NOT EXISTS`, backfills invite
+codes for existing users and creates the default discussion boards. It is
+safe to run repeatedly and never drops data.
 
-```bash
-railway run npm run db:push
-railway run npm run db:seed   # optional — creates the 8 demo QAIRU accounts
-```
+Don't run `db:seed` against production: it creates demo accounts whose
+password (`qairu123`) is public in this repo.
 
 ## 5. Deploy
 
@@ -60,7 +62,11 @@ railway up
 
 Railway builds with Nixpacks (detects Node from `package.json`, runs
 `npm install` then `npm run start`) and gives you a `*.up.railway.app`
-domain immediately.
+domain immediately. Point a health check at `/healthz` if you want one.
+
+Smoke test after a deploy: open `/invite`, copy your link, open it in a
+private window — you should see "<you> invited you" and be able to register
+with any email.
 
 ## 6. Custom domain + Cloudflare (optional)
 

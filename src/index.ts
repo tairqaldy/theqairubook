@@ -5,19 +5,23 @@ import { Hono } from "hono";
 import { mkdir } from "node:fs/promises";
 import type { AppEnv } from "./middleware/auth.js";
 import { loadUser } from "./middleware/auth.js";
+import { ensureSchema } from "./db/migrate.js";
 import { publicRoutes } from "./routes/public.js";
 import { authRoutes } from "./routes/auth.js";
 import { profileRoutes } from "./routes/profile.js";
 import { socialRoutes } from "./routes/social.js";
 import { searchRoutes } from "./routes/search.js";
 import { boardRoutes } from "./routes/board.js";
+import { messageRoutes } from "./routes/messages.js";
+import { discussRoutes } from "./routes/discuss.js";
+import { repRoutes } from "./routes/rep.js";
 
 const uploadDir = process.env.UPLOAD_DIR ?? "./uploads";
 await mkdir(uploadDir, { recursive: true });
+await ensureSchema();
 
 const app = new Hono<AppEnv>();
 
-app.use("*", loadUser);
 app.use("/static/*", serveStatic({ root: "./src" }));
 app.use(
   "/uploads/*",
@@ -26,6 +30,9 @@ app.use(
     rewriteRequestPath: (path) => path.replace(/^\/uploads/, ""),
   })
 );
+app.use("*", loadUser);
+
+app.get("/healthz", (c) => c.text("ok"));
 
 app.route("/", publicRoutes);
 app.route("/", authRoutes);
@@ -33,6 +40,9 @@ app.route("/", profileRoutes);
 app.route("/", socialRoutes);
 app.route("/", searchRoutes);
 app.route("/", boardRoutes);
+app.route("/", messageRoutes);
+app.route("/", discussRoutes);
+app.route("/", repRoutes);
 
 app.notFound((c) =>
   c.html(
@@ -44,6 +54,18 @@ app.notFound((c) =>
     404
   )
 );
+
+app.onError((err, c) => {
+  console.error(err);
+  return c.html(
+    `<html><body style="font-family:Tahoma;font-size:11px;padding:20px">
+      <h3 style="color:#3B5998">[ Something Broke ]</h3>
+      <p>Sorry — theqairubook hit an error. Try again in a moment.</p>
+      <p><a href="/">Home</a></p>
+    </body></html>`,
+    500
+  );
+});
 
 const port = Number(process.env.PORT ?? 8787);
 

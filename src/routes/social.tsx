@@ -1,36 +1,38 @@
 import { Hono } from "hono";
-import { and, eq, desc, inArray } from "drizzle-orm";
-import { randomBytes } from "node:crypto";
+import { and, eq, desc, inArray, ilike, or, ne, sql } from "drizzle-orm";
 import type { AppEnv } from "../middleware/auth.js";
-import { Layout, LeftNav, Box, formatDate } from "../views/layout.js";
+import { needLogin } from "../middleware/auth.js";
+import {
+  Layout,
+  LeftNav,
+  Box,
+  FriendButton,
+  formatDate,
+} from "../views/layout.js";
 import { db } from "../db/index.js";
-import { friendships, pokes, users, invites, type User } from "../db/schema.js";
+import { friendships, pokes, users, invites, repEvents } from "../db/schema.js";
 import {
   friendIds,
   friendshipStatus,
+  friendshipStatuses,
   addBoardEvent,
   friendsOfFriends,
+  makeReferralCode,
 } from "../lib/social.js";
+import { REP } from "../lib/rep.js";
+import { publicOrigin, backPath } from "../lib/url.js";
 
 export const socialRoutes = new Hono<AppEnv>();
-
-function needLogin(c: {
-  get: (k: "user") => User | null;
-  redirect: (u: string) => Response;
-}) {
-  const user = c.get("user");
-  if (!user) return { user: null as never, redirect: c.redirect("/login") };
-  return { user, redirect: null as Response | null };
-}
 
 socialRoutes.get("/friends", async (c) => {
   const gate = needLogin(c);
   if (gate.redirect) return gate.redirect;
   const user = gate.user;
+  const find = (c.req.query("find") ?? "").trim();
 
   const ids = await friendIds(user.id);
   const friends = ids.length
-    ? await db.select().from(users).where(inArray(users.id, ids))
+    ? await db.select().from(users).where(inArray(users.id, ids)).orderBy(users.name)
     : [];
 
   const pendingIn = await db
@@ -49,6 +51,24 @@ socialRoutes.get("/friends", async (c) => {
       and(eq(friendships.fromUserId, user.id), eq(friendships.status, "pending"))
     );
 
+  const found = find
+    ? await db
+        .select()
+        .from(users)
+        .where(
+          and(
+            ne(users.id, user.id),
+            or(ilike(users.name, `%${find}%`), ilike(users.email, `%${find}%`))
+          )
+        )
+        .orderBy(desc(users.rep))
+        .limit(20)
+    : [];
+  const foundStatus = await friendshipStatuses(
+    user.id,
+    found.map((u) => u.id)
+  );
+
   const fofIds = await friendsOfFriends(user.id);
   const fof = fofIds.length
     ? await db
@@ -56,6 +76,10 @@ socialRoutes.get("/friends", async (c) => {
         .from(users)
         .where(inArray(users.id, fofIds.slice(0, 20)))
     : [];
+  const fofStatus = await friendshipStatuses(
+    user.id,
+    fof.map((u) => u.id)
+  );
 
   return c.html(
     <Layout title="Friends" user={user} banner="My Friends">
@@ -66,7 +90,7 @@ socialRoutes.get("/friends", async (c) => {
           </td>
           <td class="maincol">
             {pendingIn.length ? (
-              <Box title="[ Friend Requests ]">
+              <Box title={`[ Friend Requests (${pendingIn.length}) ]`}>
                 {pendingIn.map(({ u }) => (
                   <p>
                     <a href={`/profile/${u.id}`}>{u.name}</a> wants to be your
@@ -74,18 +98,18 @@ socialRoutes.get("/friends", async (c) => {
                     <form
                       method="post"
                       action={`/friends/accept/${u.id}`}
-                      style="display:inline"
+                      class="inline-form"
                     >
-                      <button class="btn" type="submit">
+                      <button class="btn btn-small" type="submit">
                         Confirm
                       </button>
                     </form>{" "}
                     <form
                       method="post"
                       action={`/friends/ignore/${u.id}`}
-                      style="display:inline"
+                      class="inline-form"
                     >
-                      <button class="btn" type="submit">
+                      <button class="btn btn-small btn-gray" type="submit">
                         Ignore
                       </button>
                     </form>
@@ -94,19 +118,88 @@ socialRoutes.get("/friends", async (c) => {
               </Box>
             ) : null}
 
-            <Box title={`[ Friends (${friends.length}) ]`} alt>
+            <Box title="[ Add a Friend ]" alt>
+              <form method="get" action="/friends">
+                Find people by name or email:{" "}
+                <input
+                  type="text"
+                  name="find"
+                  size={28}
+                  value={find}
+                  placeholder="e.g. Dias or dias.b@qairu.edu.kz"
+                />{" "}
+                <button class="btn btn-small" type="submit">
+                  Find
+                </button>
+              </form>
+              {find ? (
+                found.length ? (
+                  <table class="bordertable people-table" style="margin-top:8px">
+                    {found.map((u) => (
+                      <tr>
+                        <td>
+                          <a href={`/profile/${u.id}`}>{u.name}</a>
+                          <span class="rep-chip">{u.rep}</span>
+                          <br />
+                          <span class="meta">
+                            {u.status}
+                            {u.classYear ? ` · ${u.classYear}` : ""}
+                          </span>
+                        </td>
+                        <td class="actions">
+                          <FriendButton
+                            userId={u.id}
+                            status={foundStatus.get(u.id) ?? "none"}
+                          />{" "}
+                          <a href={`/messages/with/${u.id}`}>message</a>
+                        </td>
+                      </tr>
+                    ))}
+                  </table>
+                ) : (
+                  <p class="meta">
+                    Nobody matched "{find}". Not on theqairubook yet?{" "}
+                    <a href="/invite">Send them your invite link</a>.
+                  </p>
+                )
+              ) : null}
+            </Box>
+
+            <Box title={`[ Friends (${friends.length}) ]`}>
               {friends.length ? (
-                <ul class="bullets">
+                <table class="bordertable people-table">
                   {friends.map((f) => (
-                    <li>
-                      <a href={`/profile/${f.id}`}>{f.name}</a>
-                      {f.status ? ` · ${f.status}` : ""}
-                      {f.residence ? ` · ${f.residence}` : ""}
-                    </li>
+                    <tr>
+                      <td>
+                        <a href={`/profile/${f.id}`}>{f.name}</a>
+                        <span class="rep-chip">{f.rep}</span>
+                        <br />
+                        <span class="meta">
+                          {f.status}
+                          {f.residence ? ` · ${f.residence}` : ""}
+                        </span>
+                      </td>
+                      <td class="actions">
+                        <a href={`/messages/with/${f.id}`}>message</a>
+                        {" · "}
+                        <form
+                          method="post"
+                          action={`/friends/remove/${f.id}`}
+                          class="inline-form"
+                          data-confirm={`Remove ${f.name} from your friends?`}
+                        >
+                          <button class="btn-link" type="submit">
+                            unfriend
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
                   ))}
-                </ul>
+                </table>
               ) : (
-                <p class="meta">No friends yet. Try searching for classmates!</p>
+                <p class="meta">
+                  No friends yet. Use the box above to find classmates!
+                </p>
               )}
             </Box>
 
@@ -114,21 +207,31 @@ socialRoutes.get("/friends", async (c) => {
               <Box title="[ Requests You Sent ]">
                 {pendingOut.map(({ u }) => (
                   <p>
-                    Waiting for <a href={`/profile/${u.id}`}>{u.name}</a>
+                    Waiting for <a href={`/profile/${u.id}`}>{u.name}</a>{" "}
+                    <FriendButton userId={u.id} status="pending_out" />
                   </p>
                 ))}
               </Box>
             ) : null}
 
             {fof.length ? (
-              <Box title="[ Friends of Friends ]">
-                <ul class="bullets">
+              <Box title="[ People You May Know ]">
+                <table class="bordertable people-table">
                   {fof.map((f) => (
-                    <li>
-                      <a href={`/profile/${f.id}`}>{f.name}</a>
-                    </li>
+                    <tr>
+                      <td>
+                        <a href={`/profile/${f.id}`}>{f.name}</a>
+                        <span class="rep-chip">{f.rep}</span>
+                      </td>
+                      <td class="actions">
+                        <FriendButton
+                          userId={f.id}
+                          status={fofStatus.get(f.id) ?? "none"}
+                        />
+                      </td>
+                    </tr>
                   ))}
-                </ul>
+                </table>
               </Box>
             ) : null}
           </td>
@@ -143,51 +246,46 @@ socialRoutes.post("/friends/request/:id", async (c) => {
   if (gate.redirect) return gate.redirect;
   const user = gate.user;
   const toId = Number(c.req.param("id"));
-  if (toId === user.id) return c.redirect(`/profile/${toId}`);
+  const back = backPath(c, `/profile/${toId}`);
+  if (!Number.isInteger(toId) || toId === user.id) return c.redirect(back);
+
+  const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, toId)).limit(1);
+  if (!target) return c.redirect(back);
 
   const status = await friendshipStatus(user.id, toId);
   if (status === "none") {
-    await db.insert(friendships).values({
-      fromUserId: user.id,
-      toUserId: toId,
-      status: "pending",
-    });
-  } else if (status === "pending_in") {
     await db
-      .update(friendships)
-      .set({ status: "accepted" })
-      .where(
-        and(
-          eq(friendships.fromUserId, toId),
-          eq(friendships.toUserId, user.id),
-          eq(friendships.status, "pending")
-        )
-      );
-    await addBoardEvent(user.id, "friend", "became friends", toId);
+      .insert(friendships)
+      .values({ fromUserId: user.id, toUserId: toId, status: "pending" })
+      .onConflictDoNothing();
+  } else if (status === "pending_in") {
+    await acceptRequest(user.id, toId);
   }
-  return c.redirect(`/profile/${toId}`);
+  return c.redirect(back);
 });
+
+async function acceptRequest(me: number, fromId: number) {
+  const updated = await db
+    .update(friendships)
+    .set({ status: "accepted" })
+    .where(
+      and(
+        eq(friendships.fromUserId, fromId),
+        eq(friendships.toUserId, me),
+        eq(friendships.status, "pending")
+      )
+    )
+    .returning({ id: friendships.id });
+  if (updated.length) await addBoardEvent(me, "friend", "became friends", fromId);
+}
 
 socialRoutes.post("/friends/accept/:id", async (c) => {
   const gate = needLogin(c);
   if (gate.redirect) return gate.redirect;
   const user = gate.user;
   const fromId = Number(c.req.param("id"));
-  await db
-    .update(friendships)
-    .set({ status: "accepted" })
-    .where(
-      and(
-        eq(friendships.fromUserId, fromId),
-        eq(friendships.toUserId, user.id),
-        eq(friendships.status, "pending")
-      )
-    );
-  await addBoardEvent(user.id, "friend", "became friends", fromId);
-  const back = c.req.header("referer")?.includes("/friends")
-    ? "/friends"
-    : `/profile/${fromId}`;
-  return c.redirect(back);
+  await acceptRequest(user.id, fromId);
+  return c.redirect(backPath(c, `/profile/${fromId}`));
 });
 
 socialRoutes.post("/friends/ignore/:id", async (c) => {
@@ -204,7 +302,28 @@ socialRoutes.post("/friends/ignore/:id", async (c) => {
         eq(friendships.status, "pending")
       )
     );
-  return c.redirect("/friends");
+  return c.redirect(backPath(c, "/friends"));
+});
+
+// Unfriend, or cancel a request you sent.
+socialRoutes.post("/friends/remove/:id", async (c) => {
+  const gate = needLogin(c);
+  if (gate.redirect) return gate.redirect;
+  const user = gate.user;
+  const otherId = Number(c.req.param("id"));
+  await db
+    .delete(friendships)
+    .where(
+      or(
+        and(eq(friendships.fromUserId, user.id), eq(friendships.toUserId, otherId)),
+        and(
+          eq(friendships.fromUserId, otherId),
+          eq(friendships.toUserId, user.id),
+          eq(friendships.status, "accepted")
+        )
+      )
+    );
+  return c.redirect(backPath(c, "/friends"));
 });
 
 socialRoutes.get("/pokes", async (c) => {
@@ -243,9 +362,9 @@ socialRoutes.get("/pokes", async (c) => {
                     <form
                       method="post"
                       action={`/poke/${from.id}`}
-                      style="display:inline"
+                      class="inline-form"
                     >
-                      <button class="btn" type="submit">
+                      <button class="btn btn-small" type="submit">
                         Poke Back
                       </button>
                     </form>
@@ -267,136 +386,174 @@ socialRoutes.post("/poke/:id", async (c) => {
   if (gate.redirect) return gate.redirect;
   const user = gate.user;
   const toId = Number(c.req.param("id"));
-  if (toId !== user.id) {
-    await db.insert(pokes).values({
-      fromUserId: user.id,
-      toUserId: toId,
-    });
-    await addBoardEvent(user.id, "poke", "poked", toId);
+  if (Number.isInteger(toId) && toId !== user.id) {
+    const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, toId)).limit(1);
+    if (target) {
+      await db.insert(pokes).values({
+        fromUserId: user.id,
+        toUserId: toId,
+      });
+      await addBoardEvent(user.id, "poke", "poked", toId);
+    }
   }
-  const referer = c.req.header("referer") ?? `/profile/${toId}`;
-  try {
-    const url = new URL(referer);
-    return c.redirect(url.pathname + url.search);
-  } catch {
-    return c.redirect(`/profile/${toId}`);
-  }
+  return c.redirect(backPath(c, `/profile/${toId}`));
 });
-
-function inviteUrl(c: { req: { url: string } }, token: string): string {
-  const origin = new URL(c.req.url).origin;
-  return `${origin}/join/${token}`;
-}
 
 socialRoutes.get("/invite", async (c) => {
   const gate = needLogin(c);
   if (gate.redirect) return gate.redirect;
-  const user = gate.user;
-  const notice = c.req.query("ok");
+  let user = gate.user;
 
-  const mine = await db
+  if (!user.referralCode) {
+    [user] = await db
+      .update(users)
+      .set({ referralCode: makeReferralCode(user.name) })
+      .where(eq(users.id, user.id))
+      .returning();
+  }
+
+  const origin = publicOrigin(c);
+  const link = `${origin}/r/${user.referralCode}`;
+
+  const referred = await db
+    .select()
+    .from(users)
+    .where(eq(users.referredByUserId, user.id))
+    .orderBy(desc(users.memberSince))
+    .limit(100);
+
+  const [earned] = await db
+    .select({ total: sql<number>`coalesce(sum(${repEvents.amount}), 0)::int` })
+    .from(repEvents)
+    .where(and(eq(repEvents.userId, user.id), eq(repEvents.reason, "referral")));
+
+  const legacy = await db
     .select()
     .from(invites)
     .where(eq(invites.fromUserId, user.id))
     .orderBy(desc(invites.createdAt))
     .limit(20);
+  const unusedLegacy = legacy.filter((i) => !i.usedByUserId);
 
-  const usedIds = mine.filter((i) => i.usedByUserId).map((i) => i.usedByUserId as number);
-  const joinedUsers = usedIds.length
-    ? await db.select().from(users).where(inArray(users.id, usedIds))
-    : [];
-  const nameById = new Map(joinedUsers.map((u) => [u.id, u.name]));
+  const shareText = `Join me on theqairubook — the QAIRU college directory: ${link}`;
 
   return c.html(
-    <Layout title="Invite" user={user} banner="Invite Friends">
+    <Layout title="Invite" user={user} banner="Invite Friends, Earn Rep">
       <table class="layout-table">
         <tr>
           <td class="sidebar">
             <LeftNav user={user} />
           </td>
           <td class="maincol">
-            <Box title="[ Invite a Friend ]" alt>
-              {notice ? (
-                <p class="notice">
-                  New invite link created — copy it and send it to your friend
-                  below.
-                </p>
-              ) : null}
+            <Box title="[ Your Personal Invite Link ]" alt>
               <p>
-                Generate a personal invite link. Anyone who opens it can join
-                theqairubook and register directly — no{" "}
-                <code>@qairu.edu.kz</code> email required for invited friends.
+                Send this link to QAIRU classmates. It never expires and works
+                for as many people as you like. Everyone who joins through it
+                becomes your friend automatically, and you get{" "}
+                <b>+{REP.referral} rep</b> per person.
               </p>
-              <form method="post" action="/invite">
-                <table class="search-form">
-                  <tr>
-                    <td class="field-label">Label (optional):</td>
-                    <td>
-                      <input
-                        type="text"
-                        name="email"
-                        size={35}
-                        placeholder="e.g. friend's email or name"
-                      />
-                    </td>
-                  </tr>
-                </table>
-                <div class="btn-row">
-                  <button class="btn" type="submit">
-                    Get Invite Link
-                  </button>
-                </div>
-              </form>
+              <div class="invite-link-row">
+                <input
+                  type="text"
+                  readonly
+                  id="invite-link"
+                  class="invite-link"
+                  value={link}
+                  data-select-on-click
+                />
+                <button class="btn" type="button" data-copy="#invite-link">
+                  Copy
+                </button>
+              </div>
+              <p class="share-row">
+                Share:{" "}
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("Join me on theqairubook — the QAIRU college directory")}`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Telegram
+                </a>
+                {" · "}
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  WhatsApp
+                </a>
+                {" · "}
+                <a
+                  href={`mailto:?subject=${encodeURIComponent("Join me on theqairubook")}&body=${encodeURIComponent(shareText)}`}
+                >
+                  Email
+                </a>
+              </p>
             </Box>
 
-            <Box title={`[ Your Invite Links (${mine.length}) ]`}>
-              {mine.length ? (
-                <table class="search-form">
-                  {mine.map((i) => (
-                    <tr>
-                      <td style="padding:4px 0">
-                        {i.usedByUserId ? (
-                          <span class="meta">
-                            Joined as{" "}
-                            <a href={`/profile/${i.usedByUserId}`}>
-                              {nameById.get(i.usedByUserId) ?? "a member"}
-                            </a>
-                          </span>
-                        ) : (
-                          <input
-                            type="text"
-                            readonly
-                            size={45}
-                            value={inviteUrl(c, i.token)}
-                            onclick="this.select()"
-                          />
-                        )}
-                        {i.email ? (
-                          <span class="meta"> · {i.email}</span>
-                        ) : null}
-                        <span class="meta"> · {formatDate(i.createdAt)}</span>
-                      </td>
-                    </tr>
+            <Box title="[ Your Referrals ]">
+              <table class="stat-row">
+                <tr>
+                  <td>
+                    <div class="stat-num">{referred.length}</div>
+                    <div class="meta">people joined</div>
+                  </td>
+                  <td>
+                    <div class="stat-num">+{earned?.total ?? 0}</div>
+                    <div class="meta">rep earned</div>
+                  </td>
+                  <td>
+                    <div class="stat-num">{user.rep}</div>
+                    <div class="meta">
+                      total rep · <a href="/rep">leaderboard</a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              {referred.length ? (
+                <ul class="bullets">
+                  {referred.map((u) => (
+                    <li>
+                      <a href={`/profile/${u.id}`}>{u.name}</a>
+                      <span class="meta"> · joined {formatDate(u.memberSince)}</span>
+                    </li>
                   ))}
-                </table>
+                </ul>
               ) : (
-                <p class="meta">No invite links yet.</p>
+                <p class="meta">
+                  Nobody has joined through your link yet. Drop it in your
+                  group chat!
+                </p>
               )}
+              <p class="meta">
+                Referral rep is capped at {REP.referralDailyCap} people per 24
+                hours to keep things fair.
+              </p>
             </Box>
+
+            {unusedLegacy.length ? (
+              <Box title="[ Older One-Time Links ]">
+                <p class="meta">
+                  These single-use links you made earlier still work (once
+                  each). Your personal link above is better.
+                </p>
+                {unusedLegacy.map((i) => (
+                  <p>
+                    <input
+                      type="text"
+                      readonly
+                      size={52}
+                      value={`${origin}/join/${i.token}`}
+                      data-select-on-click
+                    />
+                    {i.email ? <span class="meta"> · {i.email}</span> : null}
+                  </p>
+                ))}
+              </Box>
+            ) : null}
           </td>
         </tr>
       </table>
     </Layout>
   );
-});
-
-socialRoutes.post("/invite", async (c) => {
-  const gate = needLogin(c);
-  if (gate.redirect) return gate.redirect;
-  const user = gate.user;
-  const body = await c.req.parseBody();
-  const email = String(body.email ?? "").trim().toLowerCase();
-  const token = randomBytes(16).toString("hex");
-  await db.insert(invites).values({ fromUserId: user.id, email, token });
-  return c.redirect("/invite?ok=1");
 });

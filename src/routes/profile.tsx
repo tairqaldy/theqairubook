@@ -1,11 +1,29 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, count } from "drizzle-orm";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AppEnv } from "../middleware/auth.js";
-import { Layout, LeftNav, Box, formatDate, defaultPhoto } from "../views/layout.js";
+import { needLogin } from "../middleware/auth.js";
+import {
+  Layout,
+  LeftNav,
+  Box,
+  VoteBox,
+  UserLink,
+  FriendButton,
+  formatDate,
+  timeAgo,
+  defaultPhoto,
+} from "../views/layout.js";
 import { db } from "../db/index.js";
-import { users, wallPosts, type User } from "../db/schema.js";
+import {
+  users,
+  wallPosts,
+  discussionPosts,
+  discussionComments,
+  type User,
+  type WallPost,
+} from "../db/schema.js";
 import {
   friendshipStatus,
   mutualFriends,
@@ -13,14 +31,81 @@ import {
   areFriends,
   addBoardEvent,
   parseCourses,
+  buildTree,
+  type TreeNode,
 } from "../lib/social.js";
+import { awardReply, myVotes } from "../lib/rep.js";
+import { safeHref } from "../lib/url.js";
 
 export const profileRoutes = new Hono<AppEnv>();
 
-function needLogin(c: { get: (k: "user") => User | null; redirect: (u: string) => Response }) {
-  const user = c.get("user");
-  if (!user) return { user: null as never, redirect: c.redirect("/login") };
-  return { user, redirect: null as Response | null };
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+
+type WallRow = WallPost & { author: Pick<User, "id" | "name" | "rep"> };
+
+function WallThread(props: {
+  node: TreeNode<WallRow>;
+  viewer: User;
+  profile: User;
+  votes: Map<number, number>;
+  canReply: boolean;
+  depth: number;
+}) {
+  const { node, viewer, profile, votes, canReply, depth } = props;
+  const canDelete = node.authorUserId === viewer.id || profile.id === viewer.id;
+  return (
+    <div class={depth === 0 ? "wall-post" : "wall-reply"} id={`wall-${node.id}`}>
+      <div class="thing">
+        <VoteBox
+          type="wall"
+          id={node.id}
+          score={node.score}
+          myVote={votes.get(node.id)}
+          own={node.authorUserId === viewer.id}
+        />
+        <div class="thing-body">
+          <UserLink user={node.author} />{" "}
+          <span class="meta">
+            {depth === 0 ? "wrote" : "replied"} · {timeAgo(node.createdAt)}
+          </span>
+          <div class="post-text">{node.body}</div>
+          <div class="thing-actions">
+            {canReply ? (
+              <details class="reply-box">
+                <summary>reply</summary>
+                <form method="post" action={`/wall/${profile.id}`}>
+                  <input type="hidden" name="parentId" value={String(node.id)} />
+                  <textarea name="body" rows={2} required maxlength={2000} />
+                  <button class="btn btn-small" type="submit">
+                    Reply
+                  </button>
+                </form>
+              </details>
+            ) : null}
+            {canDelete ? (
+              <form
+                method="post"
+                action={`/wall/delete/${node.id}`}
+                class="inline-form"
+                data-confirm="Delete this post and its replies?"
+              >
+                <button class="btn-link" type="submit">
+                  delete
+                </button>
+              </form>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      {node.children.length ? (
+        <div class={depth < 4 ? "children" : "children flat"}>
+          {node.children.map((child) => (
+            <WallThread {...props} node={child} depth={depth + 1} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 profileRoutes.get("/profile/:id", async (c) => {
@@ -28,6 +113,7 @@ profileRoutes.get("/profile/:id", async (c) => {
   if (gate.redirect) return gate.redirect;
   const viewer = gate.user;
   const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.notFound();
   const [profile] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   if (!profile) return c.notFound();
 
@@ -52,21 +138,56 @@ profileRoutes.get("/profile/:id", async (c) => {
 
   const status = await friendshipStatus(viewer.id, profile.id);
   const mutual = await mutualFriends(viewer.id, profile.id);
-  const walls = await db
-    .select({
-      post: wallPosts,
-      author: users,
-    })
+
+  const authorCols = { id: users.id, name: users.name, rep: users.rep };
+  const topLevel = await db
+    .select({ post: wallPosts, author: authorCols })
     .from(wallPosts)
     .innerJoin(users, eq(wallPosts.authorUserId, users.id))
-    .where(eq(wallPosts.profileUserId, profile.id))
+    .where(and(eq(wallPosts.profileUserId, profile.id), isNull(wallPosts.parentId)))
     .orderBy(desc(wallPosts.createdAt))
     .limit(30);
+  const replies = topLevel.length
+    ? await db
+        .select({ post: wallPosts, author: authorCols })
+        .from(wallPosts)
+        .innerJoin(users, eq(wallPosts.authorUserId, users.id))
+        .where(and(eq(wallPosts.profileUserId, profile.id), isNotNull(wallPosts.parentId)))
+        .orderBy(desc(wallPosts.createdAt))
+        .limit(500)
+    : [];
+  const wallRows: WallRow[] = [...topLevel, ...replies].map((r) => ({
+    ...r.post,
+    author: r.author,
+  }));
+  const topIds = new Set(topLevel.map((r) => r.post.id));
+  const wallTree = buildTree(wallRows, (a, b) =>
+    topIds.has(a.id) && topIds.has(b.id)
+      ? b.createdAt.getTime() - a.createdAt.getTime()
+      : a.createdAt.getTime() - b.createdAt.getTime()
+  ).filter((n) => topIds.has(n.id));
+  const wallVotes = await myVotes(
+    viewer.id,
+    "wall",
+    wallRows.map((r) => r.id)
+  );
+
+  const [{ posts: postCount }] = await db
+    .select({ posts: count() })
+    .from(discussionPosts)
+    .where(and(eq(discussionPosts.authorUserId, profile.id), eq(discussionPosts.deleted, false)));
+  const [{ comments: commentCount }] = await db
+    .select({ comments: count() })
+    .from(discussionComments)
+    .where(
+      and(eq(discussionComments.authorUserId, profile.id), eq(discussionComments.deleted, false))
+    );
 
   const canWall =
     viewer.id === profile.id || (await areFriends(viewer.id, profile.id));
   const photo = defaultPhoto(profile);
   const isYou = viewer.id === profile.id;
+  const website = safeHref(profile.website);
 
   return c.html(
     <Layout
@@ -90,36 +211,30 @@ profileRoutes.get("/profile/:id", async (c) => {
             </div>
             {!isYou ? (
               <div class="profile-actions">
-                <a href={`/messages/compose?to=${profile.id}`}>
-                  Send {profile.name.split(" ")[0]} a Message
+                <a class="btn btn-block" href={`/messages/with/${profile.id}`}>
+                  Message {profile.name.split(" ")[0]}
                 </a>
-                <br />
-                <form method="post" action={`/poke/${profile.id}`} style="display:inline">
-                  <button class="btn" type="submit" style="margin-top:4px">
-                    Poke {profile.sex === "Female" ? "Her" : "Him"}!
+                <form method="post" action={`/poke/${profile.id}`}>
+                  <button class="btn btn-block btn-gray" type="submit">
+                    Poke {profile.sex === "Female" ? "Her" : profile.sex === "Male" ? "Him" : "Them"}!
                   </button>
                 </form>
-                <br />
-                {status === "none" ? (
-                  <form method="post" action={`/friends/request/${profile.id}`}>
-                    <button class="btn" type="submit" style="margin-top:4px">
-                      Add to Friends
-                    </button>
-                  </form>
-                ) : null}
-                {status === "pending_out" ? (
-                  <span class="meta">Friend request sent</span>
-                ) : null}
-                {status === "pending_in" ? (
-                  <form method="post" action={`/friends/accept/${profile.id}`}>
-                    <button class="btn" type="submit" style="margin-top:4px">
-                      Confirm Friend
-                    </button>
-                  </form>
-                ) : null}
-                {status === "friends" ? (
-                  <span class="meta">You are friends</span>
-                ) : null}
+                <div class="friend-action">
+                  <FriendButton userId={profile.id} status={status} />
+                  {status === "friends" ? (
+                    <form
+                      method="post"
+                      action={`/friends/remove/${profile.id}`}
+                      class="inline-form"
+                      data-confirm={`Remove ${profile.name} from your friends?`}
+                    >
+                      {" · "}
+                      <button class="btn-link" type="submit">
+                        unfriend
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <p>
@@ -163,6 +278,18 @@ profileRoutes.get("/profile/:id", async (c) => {
                   <tr>
                     <td class="field-label">Name:</td>
                     <td>{profile.name}</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Rep:</td>
+                    <td>
+                      <b>{profile.rep}</b>
+                      <span class="meta">
+                        {" "}
+                        · {postCount} discussion post{postCount === 1 ? "" : "s"} ·{" "}
+                        {commentCount} comment{commentCount === 1 ? "" : "s"} ·{" "}
+                        <a href="/rep">leaderboard</a>
+                      </span>
+                    </td>
                   </tr>
                   <tr>
                     <td class="field-label">Member Since:</td>
@@ -244,11 +371,13 @@ profileRoutes.get("/profile/:id", async (c) => {
                       <td>{profile.mobile}</td>
                     </tr>
                   ) : null}
-                  {profile.website ? (
+                  {website ? (
                     <tr>
                       <td class="field-label">Website:</td>
                       <td>
-                        <a href={profile.website}>{profile.website}</a>
+                        <a href={website} rel="nofollow noopener" target="_blank">
+                          {profile.website}
+                        </a>
                       </td>
                     </tr>
                   ) : null}
@@ -302,7 +431,13 @@ profileRoutes.get("/profile/:id", async (c) => {
               <div class="box-body">
                 {canWall ? (
                   <form method="post" action={`/wall/${profile.id}`}>
-                    <textarea name="body" rows={3} placeholder="Write something..." />
+                    <textarea
+                      name="body"
+                      rows={3}
+                      required
+                      maxlength={2000}
+                      placeholder={isYou ? "What's on your mind?" : `Write something to ${profile.name.split(" ")[0]}...`}
+                    />
                     <div class="btn-row">
                       <button class="btn" type="submit">
                         Post
@@ -310,20 +445,22 @@ profileRoutes.get("/profile/:id", async (c) => {
                     </div>
                   </form>
                 ) : (
-                  <p class="meta">Only friends can write on this wall.</p>
+                  <p class="meta">
+                    Only friends can start a post on this wall — but anyone can
+                    reply and vote.
+                  </p>
                 )}
-                {walls.map(({ post, author }) => (
-                  <div class="wall-post">
-                    <a href={`/profile/${author.id}`}>
-                      <b>{author.name}</b>
-                    </a>{" "}
-                    wrote
-                    <span class="meta"> · {formatDate(post.createdAt)}</span>
-                    <br />
-                    {post.body}
-                  </div>
+                {wallTree.map((node) => (
+                  <WallThread
+                    node={node}
+                    viewer={viewer}
+                    profile={profile}
+                    votes={wallVotes}
+                    canReply={true}
+                    depth={0}
+                  />
                 ))}
-                {!walls.length ? <p class="meta">No wall posts yet.</p> : null}
+                {!wallTree.length ? <p class="meta">No wall posts yet.</p> : null}
               </div>
             </div>
           </td>
@@ -337,7 +474,7 @@ profileRoutes.get("/edit-profile", async (c) => {
   const gate = needLogin(c);
   if (gate.redirect) return gate.redirect;
   const user = gate.user;
-  return c.html(editForm(user));
+  return c.html(editForm(user, undefined, c.req.query("welcome") === "1"));
 });
 
 profileRoutes.post("/edit-profile", async (c) => {
@@ -350,10 +487,11 @@ profileRoutes.post("/edit-profile", async (c) => {
   const file = body.photo;
   if (file && typeof file === "object" && "arrayBuffer" in file) {
     const f = file as File;
-    if (f.size > 0 && f.size < 5_000_000) {
+    const ext = path.extname(f.name || "").toLowerCase();
+    // Only image extensions — anything else (e.g. .html) would be served as-is.
+    if (f.size > 0 && f.size < 5_000_000 && IMAGE_EXTS.includes(ext)) {
       const uploadDir = process.env.UPLOAD_DIR ?? "./uploads";
       await mkdir(uploadDir, { recursive: true });
-      const ext = path.extname(f.name || ".jpg") || ".jpg";
       const filename = `${user.id}-${Date.now()}${ext}`;
       const buf = Buffer.from(await f.arrayBuffer());
       await writeFile(path.join(uploadDir, filename), buf);
@@ -497,27 +635,55 @@ profileRoutes.post("/wall/:id", async (c) => {
   const profileId = Number(c.req.param("id"));
   const body = await c.req.parseBody();
   const text = String(body.body ?? "").trim();
-  if (!text) return c.redirect(`/profile/${profileId}`);
+  const parentId = Number(body.parentId ?? 0) || null;
+  if (!text || !Number.isInteger(profileId)) return c.redirect(`/profile/${profileId}`);
 
-  const allowed =
-    author.id === profileId || (await areFriends(author.id, profileId));
-  if (!allowed) return c.redirect(`/profile/${profileId}`);
+  const [profile] = await db.select().from(users).where(eq(users.id, profileId)).limit(1);
+  if (!profile) return c.notFound();
 
-  await db.insert(wallPosts).values({
-    profileUserId: profileId,
-    authorUserId: author.id,
-    body: text.slice(0, 2000),
-  });
-  await addBoardEvent(
-    author.id,
-    "wall",
-    text.slice(0, 120),
-    profileId
-  );
-  return c.redirect(`/profile/${profileId}`);
+  let parent: WallPost | undefined;
+  if (parentId) {
+    // Replies: anyone who can see the profile may join the thread.
+    [parent] = await db.select().from(wallPosts).where(eq(wallPosts.id, parentId)).limit(1);
+    if (!parent || parent.profileUserId !== profileId) return c.redirect(`/profile/${profileId}`);
+    if (!(await canViewProfile(author, profile))) return c.redirect(`/profile/${profileId}`);
+  } else {
+    const allowed = author.id === profileId || (await areFriends(author.id, profileId));
+    if (!allowed) return c.redirect(`/profile/${profileId}`);
+  }
+
+  const [post] = await db
+    .insert(wallPosts)
+    .values({
+      profileUserId: profileId,
+      authorUserId: author.id,
+      parentId,
+      body: text.slice(0, 2000),
+    })
+    .returning();
+
+  if (parent) {
+    await awardReply(parent.authorUserId, author.id, "wall", parent.id);
+  } else {
+    await addBoardEvent(author.id, "wall", text.slice(0, 120), profileId);
+  }
+  return c.redirect(`/profile/${profileId}#wall-${post.id}`);
 });
 
-function editForm(user: User, error?: string) {
+profileRoutes.post("/wall/delete/:postId", async (c) => {
+  const gate = needLogin(c);
+  if (gate.redirect) return gate.redirect;
+  const user = gate.user;
+  const postId = Number(c.req.param("postId"));
+  const [post] = await db.select().from(wallPosts).where(eq(wallPosts.id, postId)).limit(1);
+  if (!post) return c.redirect("/home");
+  if (post.authorUserId === user.id || post.profileUserId === user.id) {
+    await db.delete(wallPosts).where(eq(wallPosts.id, postId));
+  }
+  return c.redirect(`/profile/${post.profileUserId}`);
+});
+
+function editForm(user: User, error?: string, welcome?: boolean) {
   return (
     <Layout title="Edit Profile" user={user} banner="Edit My Profile">
       <table class="layout-table">
@@ -527,6 +693,12 @@ function editForm(user: User, error?: string) {
           </td>
           <td class="maincol">
             <Box title="[ Edit Profile ]" alt>
+              {welcome ? (
+                <p class="notice">
+                  Welcome to theqairubook! You're already friends with whoever
+                  invited you. Fill in your profile so classmates can find you.
+                </p>
+              ) : null}
               {error ? <p class="error">{error}</p> : null}
               <form method="post" action="/edit-profile" enctype="multipart/form-data">
                 <table class="search-form">

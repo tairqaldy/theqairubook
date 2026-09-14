@@ -1,21 +1,13 @@
 import { Hono } from "hono";
-import { and, eq, ilike, sql, ne, inArray } from "drizzle-orm";
+import { and, eq, ilike, sql, ne, inArray, or, desc } from "drizzle-orm";
 import type { AppEnv } from "../middleware/auth.js";
-import { Layout, LeftNav, Box } from "../views/layout.js";
+import { needLogin } from "../middleware/auth.js";
+import { Layout, LeftNav, Box, FriendButton } from "../views/layout.js";
 import { db } from "../db/index.js";
 import { users, type User } from "../db/schema.js";
-import { parseCourses, friendIds } from "../lib/social.js";
+import { parseCourses, friendIds, friendshipStatuses } from "../lib/social.js";
 
 export const searchRoutes = new Hono<AppEnv>();
-
-function needLogin(c: {
-  get: (k: "user") => User | null;
-  redirect: (u: string) => Response;
-}) {
-  const user = c.get("user");
-  if (!user) return { user: null as never, redirect: c.redirect("/login") };
-  return { user, redirect: null as Response | null };
-}
 
 searchRoutes.get("/search", async (c) => {
   const gate = needLogin(c);
@@ -33,7 +25,7 @@ searchRoutes.get("/search", async (c) => {
 
   if (hasQuery) {
     const conditions = [ne(users.id, -1)];
-    if (q) conditions.push(ilike(users.name, `%${q}%`));
+    if (q) conditions.push(or(ilike(users.name, `%${q}%`), ilike(users.email, `%${q}%`))!);
     if (classYear) conditions.push(ilike(users.classYear, `%${classYear}%`));
     if (residence) conditions.push(ilike(users.residence, `%${residence}%`));
     if (status) conditions.push(eq(users.status, status));
@@ -43,8 +35,13 @@ searchRoutes.get("/search", async (c) => {
       .select()
       .from(users)
       .where(and(...conditions))
+      .orderBy(desc(users.rep))
       .limit(50);
   }
+  const statuses = await friendshipStatuses(
+    user.id,
+    results.map((r) => r.id)
+  );
 
   return c.html(
     <Layout title="Search" user={user} banner="Search">
@@ -58,7 +55,7 @@ searchRoutes.get("/search", async (c) => {
               <form method="get" action="/search">
                 <table class="search-form">
                   <tr>
-                    <td class="field-label">Name:</td>
+                    <td class="field-label">Name or email:</td>
                     <td>
                       <input type="text" name="q" size={30} value={q} />
                     </td>
@@ -118,16 +115,35 @@ searchRoutes.get("/search", async (c) => {
             {hasQuery ? (
               <Box title={`[ Results (${results.length}) ]`}>
                 {results.length ? (
-                  <ul class="bullets">
+                  <table class="bordertable people-table">
                     {results.map((r) => (
-                      <li>
-                        <a href={`/profile/${r.id}`}>{r.name}</a>
-                        {r.classYear ? ` · ${r.classYear}` : ""}
-                        {r.residence ? ` · ${r.residence}` : ""}
-                        {r.status ? ` · ${r.status}` : ""}
-                      </li>
+                      <tr>
+                        <td>
+                          <a href={`/profile/${r.id}`}>{r.name}</a>
+                          <span class="rep-chip">{r.rep}</span>
+                          <br />
+                          <span class="meta">
+                            {r.status}
+                            {r.classYear ? ` · ${r.classYear}` : ""}
+                            {r.residence ? ` · ${r.residence}` : ""}
+                          </span>
+                        </td>
+                        <td class="actions">
+                          {r.id === user.id ? (
+                            <span class="meta">(you)</span>
+                          ) : (
+                            <>
+                              <FriendButton
+                                userId={r.id}
+                                status={statuses.get(r.id) ?? "none"}
+                              />{" "}
+                              <a href={`/messages/with/${r.id}`}>message</a>
+                            </>
+                          )}
+                        </td>
+                      </tr>
                     ))}
-                  </ul>
+                  </table>
                 ) : (
                   <p class="meta">No people matched your search.</p>
                 )}
@@ -202,6 +218,10 @@ searchRoutes.get("/social-net", async (c) => {
     .orderBy(sql`random()`)
     .limit(10);
 
+  const randomStatus = await friendshipStatuses(
+    user.id,
+    random.map((r) => r.id)
+  );
   const myFriendIds = await friendIds(user.id);
   const myFriends = myFriendIds.length
     ? await db.select().from(users).where(inArray(users.id, myFriendIds))
@@ -241,14 +261,22 @@ searchRoutes.get("/social-net", async (c) => {
                   <td>
                     <b>Residence</b>
                   </td>
+                  <td></td>
                 </tr>
                 {random.map((r) => (
                   <tr>
                     <td>
                       <a href={`/profile/${r.id}`}>{r.name}</a>
+                      <span class="rep-chip">{r.rep}</span>
                     </td>
                     <td>{r.status}</td>
                     <td>{r.residence || "—"}</td>
+                    <td class="actions">
+                      <FriendButton
+                        userId={r.id}
+                        status={randomStatus.get(r.id) ?? "none"}
+                      />
+                    </td>
                   </tr>
                 ))}
               </table>
