@@ -1,0 +1,306 @@
+/* theqairubook — 2004 thefacebook homage */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #000000;
+  font-family: Tahoma, Verdana, Arial, Helvetica, sans-serif;
+  font-size: 11px;
+}
+
+a {
+  color: #3b5998;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  border: 0;
+}
+
+.page-wrap {
+  width: 700px;
+  margin: 0 auto;
+  border: 1px solid #3b5998;
+  border-top: none;
+}
+
+.topbar {
+  background: #3b5998;
+  color: #ffffff;
+  padding: 0;
+}
+
+.logo-row {
+  background: #3b5998;
+  text-align: center;
+  padding: 8px 10px 4px;
+}
+
+.logo {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.logo a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.menu-row {
+  background: #3b5998;
+  padding: 2px 8px 6px;
+  text-align: center;
+}
+
+.menu-row a,
+.menu a {
+  color: #ffffff;
+  font-size: 11px;
+  margin: 0 6px;
+  text-decoration: none;
+}
+
+.menu-row a:hover,
+.menu a:hover {
+  text-decoration: underline;
+}
+
+.welcome-banner {
+  background: #6d84b4;
+  color: #ffffff;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-top: 1px solid #3b5998;
+}
+
+.content {
+  padding: 12px;
+  background: #ffffff;
+}
+
+.box {
+  border: 1px solid #3b5998;
+  margin-bottom: 12px;
+  background: #ffffff;
+}
+
+.box-title {
+  background: #6d84b4;
+  color: #ffffff;
+  font-weight: bold;
+  padding: 3px 6px;
+}
+
+.box-title-alt {
+  background: #d8dfea;
+  color: #3b5998;
+  font-weight: bold;
+  padding: 3px 6px;
+  border-bottom: 1px solid #3b5998;
+}
+
+.box-body {
+  padding: 8px;
+}
+
+.bordertable {
+  border: 1px solid #3b5998;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.bordertable td {
+  padding: 3px 6px;
+  vertical-align: top;
+}
+
+.layout-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.layout-table td {
+  vertical-align: top;
+}
+
+.sidebar {
+  width: 180px;
+  padding-right: 10px;
+}
+
+.maincol {
+  width: auto;
+}
+
+.photo-frame {
+  border: 1px solid #3b5998;
+  padding: 4px;
+  text-align: center;
+  background: #ffffff;
+}
+
+.photo-frame img {
+  max-width: 160px;
+  max-height: 200px;
+  display: block;
+  margin: 0 auto;
+}
+
+.no-photo {
+  width: 160px;
+  height: 120px;
+  background: #eceff5;
+  border: 1px solid #c0c0c0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  margin: 0 auto;
+}
+
+.field-label {
+  font-weight: bold;
+  color: #000;
+  white-space: nowrap;
+  width: 110px;
+}
+
+.section-label {
+  font-weight: bold;
+  color: #3b5998;
+  padding-top: 8px;
+  padding-bottom: 2px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="file"],
+select,
+textarea {
+  font-family: Tahoma, Verdana, Arial, sans-serif;
+  font-size: 11px;
+  border: 1px solid #8496ba;
+  padding: 2px 3px;
+}
+
+textarea {
+  width: 95%;
+}
+
+.btn {
+  background: #3b5998;
+  color: #ffffff;
+  border: 1px solid #29487d;
+  font-family: Tahoma, Verdana, Arial, sans-serif;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 12px;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.btn:hover {
+  background: #2d4373;
+}
+
+.btn-row {
+  margin-top: 10px;
+}
+
+ul.bullets {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+ul.bullets li {
+  margin-bottom: 3px;
+}
+
+.error {
+  color: #c00;
+  font-weight: bold;
+  margin: 6px 0;
+}
+
+.notice {
+  color: #060;
+  margin: 6px 0;
+}
+
+.footer {
+  text-align: center;
+  padding: 10px;
+  color: #777;
+  font-size: 10px;
+  border-top: 1px solid #3b5998;
+}
+
+.footer a {
+  color: #3b5998;
+}
+
+.left-nav a {
+  display: block;
+  padding: 2px 0;
+}
+
+.friend-list a {
+  display: inline;
+}
+
+.wall-post {
+  border-bottom: 1px solid #d8dfea;
+  padding: 6px 0;
+}
+
+.wall-post:last-child {
+  border-bottom: none;
+}
+
+.meta {
+  color: #777;
+  font-size: 10px;
+}
+
+.board-item {
+  padding: 5px 0;
+  border-bottom: 1px solid #eceff5;
+}
+
+.profile-actions {
+  margin-top: 6px;
+  line-height: 1.6;
+}
+
+.search-form td {
+  padding: 3px 4px;
+}
+
+.center {
+  text-align: center;
+}
+
+.welcome-title {
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+hr.thin {
+  border: none;
+  border-top: 1px solid #d8dfea;
+  margin: 8px 0;
+}

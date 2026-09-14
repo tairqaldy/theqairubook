@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: theqairubook-db
+    environment:
+      POSTGRES_USER: qairu
+      POSTGRES_PASSWORD: qairu
+      POSTGRES_DB: theqairubook
+    ports:
+      - "5433:5432"
+    volumes:
+      - theqairubook_pg:/var/lib/postgresql/data
+
+volumes:
+  theqairubook_pg:
