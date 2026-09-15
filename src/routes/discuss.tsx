@@ -279,10 +279,20 @@ function PostRow(props: {
           </span>
         ) : null}
         <FlairTag flair={post.flair} solved={isSolved(post)} />{" "}
-        <a class="post-title" href={link ?? href}>
+        {/* The title always opens the post; an attached link is a separate small link. */}
+        <a class="post-title" href={href}>
           {post.title}
         </a>
-        {link ? <span class="meta"> ({domainOf(link)})</span> : null}
+        {link ? (
+          <span class="meta">
+            {" "}
+            (
+            <a href={link} target="_blank" rel="nofollow noopener">
+              {domainOf(link)} ↗
+            </a>
+            )
+          </span>
+        ) : null}
         <div class="meta">
           submitted {timeAgo(post.createdAt)} by{" "}
           <a href={`/profile/${author.id}`}>{author.name}</a>
