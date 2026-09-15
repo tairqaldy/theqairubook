@@ -86,6 +86,76 @@
   white-space: nowrap;
 }
 
+/* ---- compact profile information ---- */
+
+.profile-info .box-body {
+  padding: 6px 8px;
+}
+
+.profile-info .section-label {
+  padding: 6px 0 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #d8dfea;
+  font-size: 11px;
+}
+
+.info-summary {
+  font-size: 11px;
+  color: #555;
+  padding-bottom: 2px;
+}
+
+table.info-cols {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+table.info-cols > tbody > tr > td,
+table.info-cols > tr > td {
+  width: 50%;
+  vertical-align: top;
+  padding: 0;
+}
+
+table.info-cols > tbody > tr > td:first-child,
+table.info-cols > tr > td:first-child {
+  padding-right: 10px;
+}
+
+table.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+table.info-table td {
+  padding: 1px 0;
+  vertical-align: top;
+  line-height: 15px;
+}
+
+table.info-table td.field-label {
+  width: 78px;
+  padding-right: 6px;
+  color: #333;
+  font-size: 11px;
+}
+
+table.info-wide td.field-label {
+  width: 100px;
+}
+
+table.info-table td.info-value {
+  word-break: break-word;
+  white-space: pre-line;
+}
+
+table.info-table .chips {
+  margin: 0;
+  line-height: 17px;
+}
+
 /* ---- edit profile ---- */
 
 input.wide-input {

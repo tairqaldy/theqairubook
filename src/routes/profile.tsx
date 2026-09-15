@@ -98,6 +98,24 @@ const WALL_ERRORS: Record<string, string> = {
 /** Small marker admins see next to a suspended person's name. */
 const SuspendedBadge = () => <span class="suspended-badge">suspended</span>;
 
+function isEmptyChild(child: unknown): boolean {
+  if (child == null || child === false) return true;
+  if (typeof child === "string") return !child.trim();
+  if (Array.isArray(child)) return child.every(isEmptyChild);
+  return false;
+}
+
+/** One compact "Label: value" row; renders nothing when the value is empty. */
+function InfoRow({ label, children }: { label: string; children?: Child }) {
+  if (isEmptyChild(children)) return null;
+  return (
+    <tr>
+      <td class="field-label">{label}:</td>
+      <td class="info-value">{children}</td>
+    </tr>
+  );
+}
+
 // Set by /friends/request when the sender hits the rate limit.
 const FRIEND_ERRORS: Record<string, string> = {
   friend_limit: "You've sent a lot of friend requests recently. Try again in a little while.",
@@ -489,191 +507,94 @@ profileRoutes.get("/profile/:id", async (c) => {
               ) : null}
             </div>
 
-            <div class="box">
+            <div class="box profile-info">
               <div class="box-title">
                 Information{isYou ? " (This is you)" : ""}
               </div>
               <div class="box-body">
-                <div class="section-label">Account Info:</div>
-                <table>
+                <div class="info-summary">
+                  <b>{profile.rep}</b> rep · {postCount} post{postCount === 1 ? "" : "s"} ·{" "}
+                  {commentCount} comment{commentCount === 1 ? "" : "s"} · member since{" "}
+                  {formatDate(profile.claimedAt ?? profile.memberSince)} ·{" "}
+                  <a href="/rep">leaderboard</a>
+                </div>
+
+                <table class="info-cols">
                   <tr>
-                    <td class="field-label">Name:</td>
-                    <td>{profile.name}</td>
-                  </tr>
-                  <tr>
-                    <td class="field-label">Rep:</td>
                     <td>
-                      <b>{profile.rep}</b>
-                      <span class="meta">
-                        {" "}
-                        · {postCount} discussion post{postCount === 1 ? "" : "s"} ·{" "}
-                        {commentCount} comment{commentCount === 1 ? "" : "s"} ·{" "}
-                        <a href="/rep">leaderboard</a>
-                      </span>
+                      <div class="section-label">Basic Info</div>
+                      <table class="info-table">
+                        <InfoRow label="Status">{profile.status}</InfoRow>
+                        <InfoRow label="Class Year">{profile.classYear}</InfoRow>
+                        <InfoRow label="Residence">{profile.residence}</InfoRow>
+                        <InfoRow label="Home Town">{profile.hometown}</InfoRow>
+                        <InfoRow label="High School">{profile.highSchool}</InfoRow>
+                        <InfoRow label="Birthday">{profile.birthday}</InfoRow>
+                        <InfoRow label="Sex">{profile.sex}</InfoRow>
+                      </table>
+                    </td>
+                    <td>
+                      <div class="section-label">Contact</div>
+                      <table class="info-table">
+                        <InfoRow label="Email">
+                          <a href={`mailto:${profile.email}`}>{profile.email}</a>
+                        </InfoRow>
+                        {links.map((l) => (
+                          <InfoRow label={l.label}>
+                            <a href={l.href} rel="nofollow noopener" target="_blank">
+                              {l.text}
+                            </a>
+                          </InfoRow>
+                        ))}
+                        <InfoRow label="Website">
+                          {website ? (
+                            <a href={website} rel="nofollow noopener" target="_blank">
+                              {profile.website.replace(/^https?:\/\//, "")}
+                            </a>
+                          ) : null}
+                        </InfoRow>
+                        <InfoRow label="Screenname">{profile.screenname}</InfoRow>
+                        <InfoRow label="Mobile">{profile.mobile}</InfoRow>
+                      </table>
                     </td>
                   </tr>
-                  <tr>
-                    <td class="field-label">Member Since:</td>
-                    <td>{formatDate(profile.claimedAt ?? profile.memberSince)}</td>
-                  </tr>
-                  <tr>
-                    <td class="field-label">Last Update:</td>
-                    <td>{formatDate(profile.lastUpdate)}</td>
-                  </tr>
                 </table>
 
-                <div class="section-label">Basic Info:</div>
-                <table>
-                  <tr>
-                    <td class="field-label">School:</td>
-                    <td>{profile.school}</td>
-                  </tr>
-                  <tr>
-                    <td class="field-label">Status:</td>
-                    <td>{profile.status}</td>
-                  </tr>
-                  {profile.sex ? (
-                    <tr>
-                      <td class="field-label">Sex:</td>
-                      <td>{profile.sex}</td>
-                    </tr>
-                  ) : null}
-                  {profile.residence ? (
-                    <tr>
-                      <td class="field-label">Residence:</td>
-                      <td>{profile.residence}</td>
-                    </tr>
-                  ) : null}
-                  {profile.birthday ? (
-                    <tr>
-                      <td class="field-label">Birthday:</td>
-                      <td>{profile.birthday}</td>
-                    </tr>
-                  ) : null}
-                  {profile.hometown ? (
-                    <tr>
-                      <td class="field-label">Home Town:</td>
-                      <td>{profile.hometown}</td>
-                    </tr>
-                  ) : null}
-                  {profile.highSchool ? (
-                    <tr>
-                      <td class="field-label">High School:</td>
-                      <td>{profile.highSchool}</td>
-                    </tr>
-                  ) : null}
-                  {profile.classYear ? (
-                    <tr>
-                      <td class="field-label">Class Year:</td>
-                      <td>{profile.classYear}</td>
-                    </tr>
-                  ) : null}
-                </table>
-
-                <div class="section-label">Contact Info:</div>
-                <table>
-                  <tr>
-                    <td class="field-label">Email:</td>
-                    <td>
-                      <a href={`mailto:${profile.email}`}>{profile.email}</a>
-                    </td>
-                  </tr>
-                  {profile.screenname ? (
-                    <tr>
-                      <td class="field-label">Screenname:</td>
-                      <td>{profile.screenname}</td>
-                    </tr>
-                  ) : null}
-                  {profile.mobile ? (
-                    <tr>
-                      <td class="field-label">Mobile:</td>
-                      <td>{profile.mobile}</td>
-                    </tr>
-                  ) : null}
-                  {website ? (
-                    <tr>
-                      <td class="field-label">Website:</td>
-                      <td>
-                        <a href={website} rel="nofollow noopener" target="_blank">
-                          {profile.website}
-                        </a>
-                      </td>
-                    </tr>
-                  ) : null}
-                </table>
-
-                {links.length ? (
+                {lookingFor.length ||
+                profile.courses ||
+                profile.clubs ||
+                profile.interests ||
+                profile.music ||
+                profile.books ||
+                profile.aboutMe ? (
                   <>
-                    <div class="section-label">Links:</div>
-                    <p class="links-row">
-                      {links.map((l) => (
-                        <span class="link-item">
-                          <b>{l.label}:</b>{" "}
-                          <a href={l.href} rel="nofollow noopener" target="_blank">
-                            {l.text}
-                          </a>
-                        </span>
-                      ))}
-                    </p>
-                  </>
-                ) : null}
-
-                {lookingFor.length ? (
-                  <>
-                    <div class="section-label">Looking For:</div>
-                    <p class="chips">
-                      {lookingFor.map((item) => (
-                        <span class="chip">{item}</span>
-                      ))}
-                    </p>
-                  </>
-                ) : null}
-
-                {profile.courses ? (
-                  <>
-                    <div class="section-label">Courses:</div>
-                    <p>
-                      {parseCourses(profile.courses).map((course, i) => (
-                        <>
-                          {i > 0 ? ", " : ""}
-                          <a href={`/courses/${encodeURIComponent(course)}`}>
-                            {course}
-                          </a>
-                        </>
-                      ))}
-                    </p>
-                  </>
-                ) : null}
-
-                {profile.clubs ? (
-                  <>
-                    <div class="section-label">Clubs &amp; Projects:</div>
-                    <p class="pre-line">{profile.clubs}</p>
-                  </>
-                ) : null}
-
-                {profile.interests ? (
-                  <>
-                    <div class="section-label">Interests:</div>
-                    <p>{profile.interests}</p>
-                  </>
-                ) : null}
-                {profile.music ? (
-                  <>
-                    <div class="section-label">Favorite Music:</div>
-                    <p>{profile.music}</p>
-                  </>
-                ) : null}
-                {profile.books ? (
-                  <>
-                    <div class="section-label">Favorite Books:</div>
-                    <p>{profile.books}</p>
-                  </>
-                ) : null}
-                {profile.aboutMe ? (
-                  <>
-                    <div class="section-label">About Me:</div>
-                    <p class="pre-line">{profile.aboutMe}</p>
+                    <div class="section-label">Personal</div>
+                    <table class="info-table info-wide">
+                      <InfoRow label="Looking For">
+                        {lookingFor.length ? (
+                          <span class="chips">
+                            {lookingFor.map((item) => (
+                              <span class="chip">{item}</span>
+                            ))}
+                          </span>
+                        ) : null}
+                      </InfoRow>
+                      <InfoRow label="Courses">
+                        {profile.courses
+                          ? parseCourses(profile.courses).map((course, i) => (
+                              <>
+                                {i > 0 ? ", " : ""}
+                                <a href={`/courses/${encodeURIComponent(course)}`}>{course}</a>
+                              </>
+                            ))
+                          : null}
+                      </InfoRow>
+                      <InfoRow label="Clubs & Projects">{profile.clubs}</InfoRow>
+                      <InfoRow label="Interests">{profile.interests}</InfoRow>
+                      <InfoRow label="Music">{profile.music}</InfoRow>
+                      <InfoRow label="Books">{profile.books}</InfoRow>
+                      <InfoRow label="About Me">{profile.aboutMe}</InfoRow>
+                    </table>
                   </>
                 ) : null}
               </div>
